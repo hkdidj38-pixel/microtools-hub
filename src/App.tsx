@@ -91,6 +91,19 @@ function HomePage() {
   );
 }
 
+function NotFoundPage() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
+      <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">404 · Page not found</p>
+      <h1 className="mt-2 text-3xl font-extrabold text-slate-900">We couldn’t find that page</h1>
+      <p className="mt-2 max-w-md text-slate-600">The address may be incorrect, or this tool may have moved.</p>
+      <Link className="mt-6 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700" to="/">
+        Browse all tools
+      </Link>
+    </main>
+  );
+}
+
 function ToolRoute() {
   const { slug } = useParams<{ slug: string }>();
   const tool = TOOLS_REGISTRY.find((entry) => entry.slug === slug);
@@ -121,7 +134,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/tools/:slug" element={<ToolRoute />} />
-        <Route path="*" element={<HomePage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,32 +1,91 @@
-import { PDFDocument } from 'pdf-lib';
+export const MAX_PDF_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_PDF_BATCH_BYTES = 150 * 1024 * 1024;
+export const MAX_PDF_BATCH_PAGES = 2000;
 
-export async function estimatePdfPageCount(file: File): Promise<number> {
-  const document = await PDFDocument.load(await file.arrayBuffer(), { updateMetadata: false });
-  return document.getPageCount();
+interface PdfWorkerResponse {
+  pageCount?: number;
+  progress?: number;
+  buffer?: ArrayBuffer;
+  error?: string;
 }
 
-export async function mergePdfFiles(files: File[]): Promise<Blob> {
-  if (files.length < 2) {
-    throw new Error('Add at least two PDF files to merge.');
+export interface MergePdfResult {
+  blob: Blob;
+  pageCount: number;
+}
+
+function runPdfWorker(
+  request: { action: 'count'; file: File } | { action: 'merge'; files: File[] },
+  signal?: AbortSignal,
+  onProgress?: (progress: number) => void,
+): Promise<PdfWorkerResponse> {
+  if (signal?.aborted) return Promise.reject(new DOMException('PDF operation cancelled.', 'AbortError'));
+
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../../workers/pdf-merger.worker.ts', import.meta.url), { type: 'module' });
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('PDF processing timed out. Try fewer pages or smaller files.'));
+    }, 180_000);
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      signal?.removeEventListener('abort', abort);
+      worker.terminate();
+    };
+    const abort = () => {
+      cleanup();
+      reject(new DOMException('PDF operation cancelled.', 'AbortError'));
+    };
+
+    worker.onmessage = (event: MessageEvent<PdfWorkerResponse>) => {
+      const result = event.data;
+      if (typeof result.progress === 'number') {
+        onProgress?.(result.progress);
+        return;
+      }
+      cleanup();
+      if (result.error) reject(new Error(result.error));
+      else resolve(result);
+    };
+    worker.onerror = (event) => {
+      cleanup();
+      reject(new Error(event.message || 'The PDF worker stopped unexpectedly.'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+
+    try {
+      worker.postMessage(request);
+    } catch (error) {
+      cleanup();
+      reject(error instanceof Error ? error : new Error('Could not start PDF processing.'));
+    }
+  });
+}
+
+export async function estimatePdfPageCount(file: File, signal?: AbortSignal): Promise<number> {
+  const result = await runPdfWorker({ action: 'count', file }, signal);
+  return result.pageCount ?? 0;
+}
+
+export async function mergePdfFiles(
+  files: File[],
+  options: { signal?: AbortSignal; onProgress?: (progress: number) => void } = {},
+): Promise<MergePdfResult> {
+  if (files.length < 2) throw new Error('Add at least two PDF files to merge.');
+  if (files.some((file) => file.size > MAX_PDF_FILE_BYTES)) {
+    throw new Error('Each PDF must be 50 MB or smaller.');
+  }
+  if (files.reduce((sum, file) => sum + file.size, 0) > MAX_PDF_BATCH_BYTES) {
+    throw new Error('The combined PDF size must be 150 MB or smaller.');
   }
 
-  const mergedDocument = await PDFDocument.create({ updateMetadata: false });
-  for (const file of files) {
-    const sourceDocument = await PDFDocument.load(await file.arrayBuffer(), { updateMetadata: false });
-    const copiedPages = await mergedDocument.copyPages(sourceDocument, sourceDocument.getPageIndices());
-    copiedPages.forEach((page) => mergedDocument.addPage(page));
-  }
-
-  if (mergedDocument.getPageCount() === 0) {
-    throw new Error('No pages were found in the selected PDFs.');
-  }
-
-  const bytes = await mergedDocument.save();
-  const arrayBuffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-  return new Blob([arrayBuffer], { type: 'application/pdf' });
+  const result = await runPdfWorker({ action: 'merge', files }, options.signal, options.onProgress);
+  if (!result.buffer || !result.pageCount) throw new Error('The merged PDF did not contain any pages.');
+  return {
+    blob: new Blob([result.buffer], { type: 'application/pdf' }),
+    pageCount: result.pageCount,
+  };
 }
 
 export function formatPdfBytes(bytes: number): string {

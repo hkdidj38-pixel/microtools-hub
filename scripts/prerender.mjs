@@ -33,7 +33,9 @@ const xmlEsc = (value) => String(value)
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&apos;');
 
-const sitemapUrls = [`${SITE_URL}/`];
+const legacyRoutes = ['word-counter', 'text-converter', 'json-formatter', 'slug-generator']
+  .filter((slug) => fs.existsSync(path.join('public', slug, 'index.html')));
+const sitemapUrls = [`${SITE_URL}/`, ...legacyRoutes.map((slug) => `${SITE_URL}/${slug}/`)];
 
 for (const folder of folders) {
   const metaFile = path.join(toolsDir, folder, 'meta.ts');
@@ -85,10 +87,33 @@ for (const folder of folders) {
     <meta property="og:type" content="website" />
     <script type="application/ld+json">${safeJsonLd}</script>
   `;
+  const staticToolContent = `
+    <main class="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
+      <a class="mb-6 inline-flex text-sm text-slate-500" href="/">← Back to all tools</a>
+      <div class="mb-8">
+        <span class="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-600">${esc(meta.category)}</span>
+        <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">${esc(meta.name)}</h1>
+        <p class="mt-2 max-w-3xl text-base text-slate-600 sm:text-lg">${esc(meta.description)}</p>
+      </div>
+      <section aria-labelledby="faq-heading" class="mb-12">
+        <h2 id="faq-heading" class="mb-4 text-xl font-bold text-slate-900">Frequently Asked Questions</h2>
+        <div class="grid gap-4">
+          ${(meta.faqs || []).map((faq) => `
+            <article class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-1.5 font-semibold text-slate-900">${esc(faq.q)}</h3>
+              <p class="text-sm leading-relaxed text-slate-600">${esc(faq.a)}</p>
+            </article>
+          `).join('')}
+        </div>
+      </section>
+      <noscript><p>This tool requires JavaScript to process files, but your files remain on your device.</p></noscript>
+    </main>`;
+
   const pageHtml = baseHtml
     .replace(/<title>[\s\S]*?<\/title>/i, '')
     .replace(/<meta\s+name="description"[^>]*>/i, '')
-    .replace('</head>', `${seoHead}\n</head>`);
+    .replace('</head>', `${seoHead}\n</head>`)
+    .replace('<div id="root"></div>', `<div id="root">${staticToolContent}</div>`);
   const targetDir = path.join(distDir, 'tools', slug);
   fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(path.join(targetDir, 'index.html'), pageHtml, 'utf8');

@@ -1,7 +1,4 @@
-import imageCompression from 'browser-image-compression';
 import JSZip from 'jszip';
-// @ts-expect-error upng-js lacks types
-import UPNG from 'upng-js';
 
 export interface CompressionOptions {
   /** A value from 0.1 to 1.0. */
@@ -20,74 +17,159 @@ export interface CompressedItem {
   savedPercent: number;
 }
 
-async function compressPngLossy(file: File, options: CompressionOptions): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    let { width, height } = bitmap;
-    if (options.maxDimension > 0 && Math.max(width, height) > options.maxDimension) {
-      const scale = options.maxDimension / Math.max(width, height);
-      width = Math.max(1, Math.round(width * scale));
-      height = Math.max(1, Math.round(height * scale));
+interface PngWorkerResponse {
+  buffer?: ArrayBuffer;
+  error?: string;
+}
+
+interface RasterWorkerResponse {
+  blob?: Blob;
+  error?: string;
+}
+
+export const MAX_IMAGE_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_IMAGE_BATCH_BYTES = 150 * 1024 * 1024;
+
+async function compressPngInWorker(
+  file: File,
+  options: CompressionOptions,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  if (signal?.aborted) throw new DOMException('Image compression cancelled.', 'AbortError');
+
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../../workers/png-quantize.worker.ts', import.meta.url), { type: 'module' });
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('PNG compression timed out. Try a smaller image.'));
+    }, 120_000);
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      signal?.removeEventListener('abort', abort);
+      worker.terminate();
+    };
+    const abort = () => {
+      cleanup();
+      reject(new DOMException('Image compression cancelled.', 'AbortError'));
+    };
+
+    worker.onmessage = (event: MessageEvent<PngWorkerResponse>) => {
+      cleanup();
+      if (event.data.error) reject(new Error(event.data.error));
+      else if (event.data.buffer) resolve(new Blob([event.data.buffer], { type: 'image/png' }));
+      else reject(new Error('The PNG worker returned no image data.'));
+    };
+    worker.onerror = (event) => {
+      cleanup();
+      reject(new Error(event.message || 'The PNG worker stopped unexpectedly.'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+
+    try {
+      worker.postMessage({
+        file,
+        quality: Math.max(0.1, Math.min(1, options.quality)),
+        maxDimension: options.maxDimension,
+      });
+    } catch (error) {
+      cleanup();
+      reject(error instanceof Error ? error : new Error('Could not start PNG compression.'));
     }
+  });
+}
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('Could not initialize the image processing canvas.');
+async function compressRasterInWorker(
+  file: File,
+  options: CompressionOptions,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  if (signal?.aborted) throw new DOMException('Image compression cancelled.', 'AbortError');
 
-    context.drawImage(bitmap, 0, 0, width, height);
-    const rgbaBuffer = context.getImageData(0, 0, width, height).data.buffer as ArrayBuffer;
-    const quality = Math.max(0.1, Math.min(1, options.quality));
-    const cnum = quality >= 0.95
-      ? 256
-      : Math.max(16, Math.min(256, Math.round(quality * 256)));
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../../workers/image-compress.worker.ts', import.meta.url), { type: 'module' });
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('Image compression timed out. Try a smaller image.'));
+    }, 120_000);
 
-    const encodedBuffer: ArrayBuffer = UPNG.encode([rgbaBuffer], width, height, cnum);
-    return new Blob([encodedBuffer], { type: 'image/png' });
-  } finally {
-    bitmap.close();
-  }
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      signal?.removeEventListener('abort', abort);
+      worker.terminate();
+    };
+    const abort = () => {
+      cleanup();
+      reject(new DOMException('Image compression cancelled.', 'AbortError'));
+    };
+
+    worker.onmessage = (event: MessageEvent<RasterWorkerResponse>) => {
+      cleanup();
+      if (event.data.error) reject(new Error(event.data.error));
+      else if (event.data.blob) resolve(event.data.blob);
+      else reject(new Error('The image worker returned no compressed image.'));
+    };
+    worker.onerror = (event) => {
+      cleanup();
+      reject(new Error(event.message || 'The image worker stopped unexpectedly.'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+
+    try {
+      worker.postMessage({
+        file,
+        quality: Math.max(0.1, Math.min(1, options.quality)),
+        maxDimension: options.maxDimension,
+      });
+    } catch (error) {
+      cleanup();
+      reject(error instanceof Error ? error : new Error('Could not start image compression.'));
+    }
+  });
 }
 
 export async function compressSingleImage(
   file: File,
   options: CompressionOptions,
+  signal?: AbortSignal,
 ): Promise<Blob> {
+  if (file.size > MAX_IMAGE_FILE_BYTES) throw new Error('Each image must be 50 MB or smaller.');
+  if (signal?.aborted) throw new DOMException('Image compression cancelled.', 'AbortError');
+
   const isPng = file.type.toLowerCase() === 'image/png' || file.name.toLowerCase().endsWith('.png');
   const quality = Math.max(0.1, Math.min(1, options.quality));
   let resultBlob: Blob;
 
   if (isPng) {
-    resultBlob = await compressPngLossy(file, { ...options, quality });
+    resultBlob = await compressPngInWorker(file, { ...options, quality }, signal);
   } else {
-    resultBlob = await imageCompression(file, {
-      maxSizeMB: 25,
-      ...(options.maxDimension > 0 ? { maxWidthOrHeight: options.maxDimension } : {}),
-      useWebWorker: true,
-      initialQuality: quality,
-    });
+    resultBlob = await compressRasterInWorker(file, { ...options, quality }, signal);
   }
 
-  // The original is the safe fallback for already-optimized or tiny images.
   return resultBlob.size < file.size ? resultBlob : file;
+}
+
+function uniqueZipEntryName(originalName: string, usedNames: Set<string>): string {
+  const safeName = (originalName || 'image').replace(/[\\/]/g, '_');
+  const dot = safeName.lastIndexOf('.');
+  const stem = dot > 0 ? safeName.slice(0, dot) : safeName;
+  const extension = dot > 0 ? safeName.slice(dot) : '';
+  let candidate = safeName;
+  let suffix = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    candidate = `${stem} (${suffix})${extension}`;
+    suffix += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
 }
 
 export async function generateBatchZip(items: CompressedItem[]): Promise<Blob> {
   const zip = new JSZip();
-  const usedNames = new Map<string, number>();
-
+  const usedNames = new Set<string>();
   items.forEach((item) => {
-    const originalName = item.originalFile.name || 'image';
-    const dot = originalName.lastIndexOf('.');
-    const stem = dot > 0 ? originalName.slice(0, dot) : originalName;
-    const extension = dot > 0 ? originalName.slice(dot) : '';
-    const count = usedNames.get(originalName.toLowerCase()) ?? 0;
-    usedNames.set(originalName.toLowerCase(), count + 1);
-    const name = count === 0 ? originalName : `${stem} (${count + 1})${extension}`;
-    zip.file(name, item.compressedBlob);
+    zip.file(uniqueZipEntryName(item.originalFile.name, usedNames), item.compressedBlob);
   });
-
   return zip.generateAsync({ type: 'blob' });
 }
 

@@ -14,6 +14,8 @@ import {
   compressSingleImage,
   formatBytes,
   generateBatchZip,
+  MAX_IMAGE_BATCH_BYTES,
+  MAX_IMAGE_FILE_BYTES,
   type CompressedItem,
   type CompressionOptions,
 } from './logic';
@@ -33,6 +35,14 @@ export default function ImageCompressorTool() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<CompressedItem[]>([]);
   const runIdRef = useRef(0);
+  const zipRunIdRef = useRef(0);
+  const batchAbortRef = useRef<AbortController | null>(null);
+  const temporaryDownloadUrlsRef = useRef(new Set<string>());
+
+  const revokeTemporaryDownloadUrls = () => {
+    temporaryDownloadUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    temporaryDownloadUrlsRef.current.clear();
+  };
 
   const replaceItems = (next: CompressedItem[]) => {
     itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
@@ -42,13 +52,20 @@ export default function ImageCompressorTool() {
 
   useEffect(() => () => {
     runIdRef.current += 1;
+    zipRunIdRef.current += 1;
+    batchAbortRef.current?.abort();
     itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     itemsRef.current = [];
+    revokeTemporaryDownloadUrls();
   }, []);
 
   const runBatchCompression = async (filesToProcess: File[], options: CompressionOptions) => {
     if (filesToProcess.length === 0) return;
+    batchAbortRef.current?.abort();
+    const controller = new AbortController();
+    batchAbortRef.current = controller;
     const runId = ++runIdRef.current;
+    replaceItems([]);
     setIsProcessing(true);
     setErrorMsg(null);
     setNotice(null);
@@ -56,7 +73,7 @@ export default function ImageCompressorTool() {
 
     try {
       for (const file of filesToProcess) {
-        const compressedBlob = await compressSingleImage(file, options);
+        const compressedBlob = await compressSingleImage(file, options, controller.signal);
         if (runId !== runIdRef.current) {
           results.forEach((item) => URL.revokeObjectURL(item.previewUrl));
           return;
@@ -78,11 +95,14 @@ export default function ImageCompressorTool() {
       if (runId === runIdRef.current) replaceItems(results);
     } catch (error) {
       results.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-      if (runId === runIdRef.current) {
+      if (runId === runIdRef.current && !controller.signal.aborted) {
         setErrorMsg(error instanceof Error ? error.message : 'Could not compress one or more images.');
       }
     } finally {
-      if (runId === runIdRef.current) setIsProcessing(false);
+      if (runId === runIdRef.current) {
+        batchAbortRef.current = null;
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -91,19 +111,39 @@ export default function ImageCompressorTool() {
     const selected = Array.from(fileList);
     const valid = selected.filter((file) => ACCEPTED_IMAGE.test(file.name)
       && ['image/png', 'image/jpeg', 'image/webp', ''].includes(file.type.toLowerCase()));
-    const rejectedCount = selected.length - valid.length;
-    const availableSlots = Math.max(0, MAX_FILES - rawFiles.length);
-    const accepted = valid.slice(0, availableSlots);
+    const invalidCount = selected.length - valid.length;
+    const slots = Math.max(0, MAX_FILES - rawFiles.length);
+    let batchBytes = rawFiles.reduce((sum, file) => sum + file.size, 0);
+    const accepted: File[] = [];
+    let tooLargeCount = 0;
+    let batchLimitCount = 0;
 
-    if (rejectedCount > 0) setNotice(`${rejectedCount} unsupported file${rejectedCount === 1 ? ' was' : 's were'} skipped. Choose PNG, JPG, or WebP images.`);
-    if (valid.length > availableSlots) {
-      setNotice(`A batch can contain up to ${MAX_FILES} images. The extra files were not added.`);
+    for (const file of valid) {
+      if (accepted.length >= slots) {
+        batchLimitCount += 1;
+      } else if (file.size > MAX_IMAGE_FILE_BYTES) {
+        tooLargeCount += 1;
+      } else if (batchBytes + file.size > MAX_IMAGE_BATCH_BYTES) {
+        batchLimitCount += 1;
+      } else {
+        accepted.push(file);
+        batchBytes += file.size;
+      }
     }
+
+    setErrorMsg(null);
+    const notices = [
+      invalidCount > 0 ? `${invalidCount} unsupported file${invalidCount === 1 ? ' was' : 's were'} skipped; choose PNG, JPG, or WebP.` : '',
+      tooLargeCount > 0 ? `${tooLargeCount} image${tooLargeCount === 1 ? ' exceeds' : 's exceed'} the 50 MB per-file limit.` : '',
+      batchLimitCount > 0 ? `${MAX_FILES}-file / 150 MB batch limit reached; extra images were skipped.` : '',
+    ].filter(Boolean);
+    setNotice(notices.length > 0 ? notices.join(' ') : null);
+
     if (accepted.length === 0) {
-      if (selected.length > 0 && rejectedCount === selected.length) {
+      if (selected.length > 0 && invalidCount === selected.length) {
         setErrorMsg('Please select valid PNG, JPG, or WebP images.');
-      } else if (rawFiles.length >= MAX_FILES) {
-        setErrorMsg(`You have reached the ${MAX_FILES}-image batch limit. Clear the batch to start again.`);
+      } else if (slots === 0 || batchBytes >= MAX_IMAGE_BATCH_BYTES) {
+        setErrorMsg(`This batch is limited to ${MAX_FILES} images and 150 MB total. Clear the batch to start again.`);
       }
       return;
     }
@@ -115,8 +155,13 @@ export default function ImageCompressorTool() {
 
   const handleClearAll = () => {
     runIdRef.current += 1;
+    zipRunIdRef.current += 1;
+    batchAbortRef.current?.abort();
+    batchAbortRef.current = null;
     setIsProcessing(false);
+    setIsZipping(false);
     replaceItems([]);
+    revokeTemporaryDownloadUrls();
     setRawFiles([]);
     setErrorMsg(null);
     setNotice(null);
@@ -125,22 +170,33 @@ export default function ImageCompressorTool() {
 
   const handleDownloadZip = async () => {
     if (items.length === 0 || isZipping) return;
+    const token = ++zipRunIdRef.current;
+    let downloadUrl: string | null = null;
     setIsZipping(true);
     setErrorMsg(null);
     try {
       const zipBlob = await generateBatchZip(items);
-      const url = URL.createObjectURL(zipBlob);
+      if (token !== zipRunIdRef.current) return;
+      downloadUrl = URL.createObjectURL(zipBlob);
+      temporaryDownloadUrlsRef.current.add(downloadUrl);
       const anchor = document.createElement('a');
-      anchor.href = url;
+      anchor.href = downloadUrl;
       anchor.download = `compressed-images-${Date.now()}.zip`;
       document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      try {
+        anchor.click();
+      } finally {
+        anchor.remove();
+      }
     } catch {
-      setErrorMsg('The ZIP file could not be created. Please try again.');
+      if (token === zipRunIdRef.current) setErrorMsg('The ZIP file could not be created. Please try again.');
     } finally {
-      setIsZipping(false);
+      if (downloadUrl) {
+        window.setTimeout(() => {
+          if (temporaryDownloadUrlsRef.current.delete(downloadUrl!)) URL.revokeObjectURL(downloadUrl!);
+        }, 30_000);
+      }
+      if (token === zipRunIdRef.current) setIsZipping(false);
     }
   };
 
@@ -198,17 +254,24 @@ export default function ImageCompressorTool() {
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={isProcessing || rawFiles.length >= MAX_FILES}
-        onClick={() => fileInputRef.current?.click()}
+      <div
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
-          handleFilesSelected(event.dataTransfer.files);
+          if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
         }}
-        className="block w-full rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 p-8 text-center transition hover:border-indigo-500 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
       >
+        <button
+          type="button"
+          disabled={isProcessing || rawFiles.length >= MAX_FILES}
+          onClick={() => fileInputRef.current?.click()}
+          className="block w-full rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 p-8 text-center transition hover:border-indigo-500 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
+        >
+          <UploadCloud className="mx-auto mb-3 h-11 w-11 text-indigo-600" aria-hidden="true" />
+          <span className="block font-bold text-slate-900">Drop images here or click to browse</span>
+          <span className="mt-1 block text-xs text-slate-500">PNG, JPG, or WebP · Up to {MAX_FILES} images · 50 MB per file · 150 MB total</span>
+          {rawFiles.length > 0 && <span className="mt-2 block text-xs font-semibold text-indigo-700">{rawFiles.length} of {MAX_FILES} selected</span>}
+        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -217,17 +280,12 @@ export default function ImageCompressorTool() {
           className="sr-only"
           tabIndex={-1}
           aria-label="Choose PNG, JPG, or WebP images"
-          onClick={(event) => event.stopPropagation()}
           onChange={(event) => {
             handleFilesSelected(event.target.files);
             event.target.value = '';
           }}
         />
-        <UploadCloud className="mx-auto mb-3 h-11 w-11 text-indigo-600" aria-hidden="true" />
-        <span className="block font-bold text-slate-900">Drop images here or click to browse</span>
-        <span className="mt-1 block text-xs text-slate-500">PNG, JPG, or WebP · Up to {MAX_FILES} images · Processed only in your browser</span>
-        {rawFiles.length > 0 && <span className="mt-2 block text-xs font-semibold text-indigo-700">{rawFiles.length} of {MAX_FILES} selected</span>}
-      </button>
+      </div>
 
       <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3.5 py-3 text-xs leading-relaxed text-slate-600">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
