@@ -30,6 +30,16 @@ AGENTS.md             # Project rules
 README.md             # This file
 ```
 
+## Continuous Integration
+
+- **CodeQL Advanced** (`.github/workflows/codeql.yml`) - static analysis for `javascript-typescript`
+  and `actions` on pushes and pull requests to `main`, plus a weekly scheduled scan.
+- **Dependabot** (`.github/dependabot.yml`) - weekly pull requests that keep GitHub Actions versions
+  current, so workflow actions cannot silently fall behind.
+
+The `main` branch is protected: changes must land through a pull request, and force-pushes and
+branch deletion are blocked.
+
 ## Deployment on Cloudflare Pages
 
 1. Connect your GitHub repository to Cloudflare Pages.
