@@ -1,55 +1,49 @@
 # MicroTools Hub
 
-A collection of free, privacy-focused online tools for productivity, built with HTML, CSS, and vanilla JavaScript. Runs entirely in the browser with no backend.
+A collection of free, privacy-focused browser utilities. The site combines the existing lightweight static tools with an auto-discovered React tool library, built as static files for Cloudflare Pages.
 
-## Tools Included
-- **Word Counter**: Analyze text length, word count, sentences, paragraphs, and reading time.
-- **Text Case Converter**: Transform text between UPPERCASE, lowercase, Title Case, camelCase, and more.
-- **JSON Formatter & Validator**: Pretty-print, minify, and validate JSON data.
-- **URL Slug Generator**: Turn any title into a clean, SEO-friendly URL slug.
+## Tools
 
-## Features
-- **Dark mode toggle** with system preference detection and saved selection.
-- Responsive and accessible design that works on mobile and desktop.
-- Separate SEO-friendly URL for each tool.
-- All processing is local to your browser — your data never leaves your device.
+- **Image Compressor** — Compress PNG, JPG, and WebP images in batches of up to 50, resize to common dimensions, and download results individually or as a ZIP. All image processing stays in the browser.
+- **Word Counter** — Analyze words, characters, sentences, paragraphs, and reading time.
+- **Text Case Converter** — Transform text between common capitalization and programming naming styles.
+- **JSON Formatter & Validator** — Pretty-print, minify, and validate JSON.
+- **URL Slug Generator** — Create SEO-friendly URL slugs.
 
-## Project Structure
-```
-public/               # All deployable files
-  index.html          # Homepage
-  word-counter/       # Word Counter tool
-  text-converter/     # Text Case Converter tool
-  json-formatter/     # JSON Formatter & Validator tool
-  slug-generator/     # URL Slug Generator tool
-  css/styles.css      # Shared styles (light + dark themes)
-  js/                 # Tool scripts and shared theme logic
-  robots.txt
-  sitemap.xml
-AGENTS.md             # Project rules
-README.md             # This file
+## Development
+
+Requirements: Node.js 20 or newer.
+
+```sh
+npm ci
+npm run dev
 ```
 
-## Continuous Integration
+The development server serves the React tool library at `/` and retains the classic utilities at `/word-counter/`, `/text-converter/`, `/json-formatter/`, and `/slug-generator/`.
 
-- **CodeQL Advanced** (`.github/workflows/codeql.yml`) - static analysis for `javascript-typescript`
-  and `actions` on pushes and pull requests to `main`, plus a weekly scheduled scan.
-- **Dependabot** (`.github/dependabot.yml`) - weekly pull requests that keep GitHub Actions versions
-  current, so workflow actions cannot silently fall behind.
+## Build and deploy
 
-The `main` branch is protected: changes must land through a pull request, and force-pushes and
-branch deletion are blocked.
+```sh
+npm run build
+```
 
-## Deployment on Cloudflare Pages
+This runs TypeScript checks, creates a Vite static build in `dist/`, pre-renders each registered tool's SEO page, and writes `dist/sitemap.xml`. Cloudflare Pages should use `npm run build` as the build command and `dist` as the output directory. Set `SITE_URL` during the build if deploying to a domain other than `https://microtools-hub.pages.dev`.
 
-1. Connect your GitHub repository to Cloudflare Pages.
-2. Use the following build settings:
-   - **Framework preset**: None
-   - **Build command**: `exit 0`
-   - **Build output directory**: `public`
-   - **Root directory**: (Leave blank)
-3. Deploy!
-4. After the first deploy, update the domain in `public/robots.txt` and `public/sitemap.xml` to your live URL.
+## Adding a tool
+
+Create the following files under `src/tools/<slug>/`:
+
+- `meta.ts` — a plain `export const meta = { ... }` object with no imports or TypeScript annotations; prerendering evaluates this file directly in Node.
+- `logic.ts` — client-side functionality.
+- `index.tsx` — React interface.
+
+The Vite glob in `src/lib/registry.ts` discovers each tool automatically. Tool image or file processing must remain in the user's browser; never add a server-side file-processing endpoint.
 
 ## Privacy
-All processing happens locally in your browser. Your data never leaves your device. There are no external API calls, no analytics, and no tracking.
+
+The tools process user content locally. Image compression uses browser APIs, Web Workers, PNG quantization, and local ZIP creation; files are not sent to a server. There is no analytics or tracking.
+
+## Continuous integration
+
+- **CodeQL Advanced** scans JavaScript/TypeScript and GitHub Actions.
+- **Dependabot** checks GitHub Actions dependencies weekly.
