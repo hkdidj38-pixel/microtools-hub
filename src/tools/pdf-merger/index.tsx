@@ -11,7 +11,14 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
-import { estimatePdfPageCount, formatPdfBytes, mergePdfFiles } from './logic';
+import {
+  estimatePdfPageCount,
+  formatPdfBytes,
+  MAX_PDF_BATCH_BYTES,
+  MAX_PDF_BATCH_PAGES,
+  MAX_PDF_FILE_BYTES,
+  mergePdfFiles,
+} from './logic';
 
 const MAX_PDFS = 50;
 const PDF_EXTENSION = /\.pdf$/i;
@@ -38,6 +45,7 @@ export default function PdfMergerTool() {
   const [pdfs, setPdfs] = useState<PdfEntry[]>([]);
   const [mergedOutput, setMergedOutput] = useState<MergedOutput | null>(null);
   const [isMerging, setIsMerging] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +53,8 @@ export default function PdfMergerTool() {
   const mergeTokenRef = useRef(0);
   const pdfsRef = useRef<PdfEntry[]>([]);
   const estimateQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const estimateAbortRef = useRef(new AbortController());
+  const mergeAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(false);
 
   const updatePdfs = (next: PdfEntry[]) => {
@@ -63,6 +73,8 @@ export default function PdfMergerTool() {
     return () => {
       mountedRef.current = false;
       mergeTokenRef.current += 1;
+      estimateAbortRef.current.abort();
+      mergeAbortRef.current?.abort();
       if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
       outputUrlRef.current = null;
     };
@@ -71,26 +83,42 @@ export default function PdfMergerTool() {
   const addFiles = (fileList: FileList | null) => {
     if (!fileList) return;
     const selected = Array.from(fileList);
-    const valid = selected.filter((file) => PDF_EXTENSION.test(file.name)
-      && (file.type === '' || file.type.toLowerCase() === 'application/pdf'));
-    const rejected = selected.length - valid.length;
+    const valid = selected.filter((file) => PDF_EXTENSION.test(file.name) || file.type.toLowerCase() === 'application/pdf');
+    const invalidCount = selected.length - valid.length;
     const slots = Math.max(0, MAX_PDFS - pdfsRef.current.length);
-    const accepted = valid.slice(0, slots);
+    let batchBytes = pdfsRef.current.reduce((sum, entry) => sum + entry.file.size, 0);
+    const accepted: File[] = [];
+    let tooLargeCount = 0;
+    let batchLimitCount = 0;
+    let fileLimitCount = 0;
+
+    for (const file of valid) {
+      if (accepted.length >= slots) {
+        fileLimitCount += 1;
+      } else if (file.size > MAX_PDF_FILE_BYTES) {
+        tooLargeCount += 1;
+      } else if (batchBytes + file.size > MAX_PDF_BATCH_BYTES) {
+        batchLimitCount += 1;
+      } else {
+        accepted.push(file);
+        batchBytes += file.size;
+      }
+    }
 
     setErrorMessage(null);
-    if (rejected > 0) {
-      setNotice(`${rejected} unsupported file${rejected === 1 ? ' was' : 's were'} skipped. Please choose PDF files.`);
-    }
-    if (valid.length > slots) {
-      setNotice(`You can add up to ${MAX_PDFS} PDFs. Extra files were not added.`);
-    } else if (rejected === 0) {
-      setNotice(null);
-    }
+    const notices = [
+      invalidCount > 0 ? `${invalidCount} unsupported file${invalidCount === 1 ? ' was' : 's were'} skipped.` : '',
+      tooLargeCount > 0 ? `${tooLargeCount} PDF${tooLargeCount === 1 ? ' exceeds' : 's exceed'} the 50 MB per-file limit.` : '',
+      batchLimitCount > 0 ? 'The combined PDF size limit is 150 MB; extra files were skipped.' : '',
+      fileLimitCount > 0 ? `A batch can contain at most ${MAX_PDFS} PDF files.` : '',
+    ].filter(Boolean);
+    setNotice(notices.length > 0 ? notices.join(' ') : null);
+
     if (accepted.length === 0) {
-      if (selected.length > 0 && rejected === selected.length) {
-        setErrorMessage('Please select one or more valid PDF files.');
-      } else if (pdfsRef.current.length >= MAX_PDFS) {
-        setErrorMessage(`The ${MAX_PDFS}-file limit has been reached. Remove a file before adding more.`);
+      if (selected.length > 0 && invalidCount === selected.length) {
+        setErrorMessage('Please select valid PDF files.');
+      } else if (slots === 0 || batchBytes >= MAX_PDF_BATCH_BYTES) {
+        setErrorMessage(`A batch is limited to ${MAX_PDFS} PDFs and 150 MB total. Remove files before adding more.`);
       }
       return;
     }
@@ -104,20 +132,27 @@ export default function PdfMergerTool() {
       error: null,
     } satisfies PdfEntry));
     updatePdfs([...pdfsRef.current, ...entries]);
+    const estimateSignal = estimateAbortRef.current.signal;
 
     estimateQueueRef.current = estimateQueueRef.current.then(async () => {
       for (const entry of entries) {
-        if (!mountedRef.current || !pdfsRef.current.some((current) => current.id === entry.id)) continue;
+        if (!mountedRef.current || estimateSignal.aborted) return;
+        if (!pdfsRef.current.some((current) => current.id === entry.id)) continue;
         try {
-          const pageCount = await estimatePdfPageCount(entry.file);
-          if (!mountedRef.current) return;
+          const pageCount = await estimatePdfPageCount(entry.file, estimateSignal);
+          if (!mountedRef.current || estimateSignal.aborted) return;
+          const otherPages = pdfsRef.current.reduce((sum, current) =>
+            sum + (current.id !== entry.id ? current.pageCount ?? 0 : 0), 0);
+          const error = otherPages + pageCount > MAX_PDF_BATCH_PAGES
+            ? `The batch cannot exceed ${MAX_PDF_BATCH_PAGES.toLocaleString()} pages.`
+            : null;
           updatePdfs(pdfsRef.current.map((current) => current.id === entry.id
-            ? { ...current, pageCount, isEstimating: false }
+            ? { ...current, pageCount, isEstimating: false, error }
             : current));
         } catch {
-          if (!mountedRef.current) return;
+          if (!mountedRef.current || estimateSignal.aborted) return;
           updatePdfs(pdfsRef.current.map((current) => current.id === entry.id
-            ? { ...current, isEstimating: false, error: 'Could not read this PDF. It may be invalid or encrypted.' }
+            ? { ...current, isEstimating: false, error: 'Could not read this PDF. It may be invalid, encrypted, or over the page limit.' }
             : current));
         }
       }
@@ -142,7 +177,12 @@ export default function PdfMergerTool() {
 
   const clearAll = () => {
     mergeTokenRef.current += 1;
+    mergeAbortRef.current?.abort();
+    mergeAbortRef.current = null;
+    estimateAbortRef.current.abort();
+    estimateAbortRef.current = new AbortController();
     setIsMerging(false);
+    setMergeProgress(0);
     updatePdfs([]);
     clearMergedOutput();
     setErrorMessage(null);
@@ -153,23 +193,31 @@ export default function PdfMergerTool() {
   const mergeAll = async () => {
     if (pdfs.length < 2 || pdfs.some((entry) => entry.isEstimating || entry.error)) return;
     const token = ++mergeTokenRef.current;
+    const controller = new AbortController();
+    mergeAbortRef.current = controller;
     setIsMerging(true);
+    setMergeProgress(0);
     setErrorMessage(null);
     clearMergedOutput();
 
     try {
-      const blob = await mergePdfFiles(pdfs.map((entry) => entry.file));
+      const result = await mergePdfFiles(pdfs.map((entry) => entry.file), {
+        signal: controller.signal,
+        onProgress: setMergeProgress,
+      });
       if (token !== mergeTokenRef.current) return;
-      const pageCount = pdfs.reduce((sum, entry) => sum + (entry.pageCount ?? 0), 0);
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(result.blob);
       outputUrlRef.current = url;
-      setMergedOutput({ url, size: blob.size, pageCount });
+      setMergedOutput({ url, size: result.blob.size, pageCount: result.pageCount });
     } catch (error) {
-      if (token === mergeTokenRef.current) {
+      if (token === mergeTokenRef.current && !controller.signal.aborted) {
         setErrorMessage(error instanceof Error ? error.message : 'Could not merge these PDF files.');
       }
     } finally {
-      if (token === mergeTokenRef.current) setIsMerging(false);
+      if (token === mergeTokenRef.current) {
+        mergeAbortRef.current = null;
+        setIsMerging(false);
+      }
     }
   };
 
@@ -181,13 +229,23 @@ export default function PdfMergerTool() {
   return (
     <div className="space-y-6">
       <div
+        role="button"
+        tabIndex={isMerging ? -1 : 0}
+        aria-label="Choose PDF files or drop them here"
+        aria-disabled={isMerging}
+        onKeyDown={(event) => {
+          if (!isMerging && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
           if (!isMerging) addFiles(event.dataTransfer.files);
         }}
         onClick={() => !isMerging && fileInputRef.current?.click()}
-        className={`rounded-2xl border-2 border-dashed p-8 text-center transition sm:p-10 ${isMerging ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60' : 'cursor-pointer border-indigo-300 bg-indigo-50/40 hover:border-indigo-500 hover:bg-indigo-50'}`}
+        className={`rounded-2xl border-2 border-dashed p-8 text-center transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200 sm:p-10 ${isMerging ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60' : 'cursor-pointer border-indigo-300 bg-indigo-50/40 hover:border-indigo-500 hover:bg-indigo-50'}`}
       >
         <input
           ref={fileInputRef}
@@ -207,6 +265,7 @@ export default function PdfMergerTool() {
         <UploadCloud className="mx-auto mb-3 h-11 w-11 text-indigo-600" aria-hidden="true" />
         <p className="font-bold text-slate-900">Drop PDF files here or click to browse</p>
         <p className="mt-1 text-xs text-slate-500">Add multiple PDFs, then organize them in the order you want.</p>
+        <p className="mt-1 text-xs text-slate-500">Maximum 50 files · 50 MB each · 150 MB total · {MAX_PDF_BATCH_PAGES.toLocaleString()} pages</p>
       </div>
 
       <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3.5 py-3 text-xs leading-relaxed text-slate-600">
@@ -230,10 +289,9 @@ export default function PdfMergerTool() {
             <button
               type="button"
               onClick={clearAll}
-              disabled={isMerging}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
             >
-              <Trash2 className="h-4 w-4" aria-hidden="true" /> Clear all
+              <Trash2 className="h-4 w-4" aria-hidden="true" /> {isMerging ? 'Cancel & clear' : 'Clear all'}
             </button>
           </div>
 
@@ -296,9 +354,17 @@ export default function PdfMergerTool() {
       )}
 
       {isMerging && (
-        <p className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800" role="status" aria-live="polite">
-          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Merging {pdfs.length} files ({totalPages} pages). Keep this tab open until the download is ready.
-        </p>
+        <div className="space-y-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800" role="status" aria-live="polite">
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2">
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Merging {pdfs.length} files ({totalPages} pages)…
+            </p>
+            <span className="text-xs font-semibold tabular-nums">{mergeProgress}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-indigo-100" role="progressbar" aria-label="PDF merge progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={mergeProgress}>
+            <div className="h-full rounded-full bg-indigo-600 transition-[width]" style={{ width: `${mergeProgress}%` }} />
+          </div>
+        </div>
       )}
 
       {mergedOutput && (
