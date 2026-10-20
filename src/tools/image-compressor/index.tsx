@@ -207,11 +207,11 @@ export default function ImageCompressorTool() {
     : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-5 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
+    <div className="tool-workspace space-y-6">
+      <div className="grid gap-5 rounded-xl border border-line bg-paper p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
         <div>
-          <label htmlFor="quality" className="mb-2 block text-xs font-semibold text-slate-700">
-            Compression quality <span className="ml-1 text-indigo-600">{quality}%</span>
+          <label htmlFor="quality" className="mb-2 block text-xs font-semibold text-ink">
+            Compression quality <span className="ml-1 text-brand">{quality}%</span>
           </label>
           <input
             id="quality"
@@ -221,18 +221,18 @@ export default function ImageCompressorTool() {
             step={5}
             value={quality}
             onChange={(event) => setQuality(Number(event.target.value))}
-            className="w-full accent-indigo-600"
+            className="w-full accent-brand"
           />
-          <div className="mt-1 flex justify-between text-[11px] text-slate-500"><span>Smaller file</span><span>Higher quality</span></div>
+          <div className="mt-1 flex justify-between text-[11px] text-muted"><span>Smaller file</span><span>Higher quality</span></div>
         </div>
 
         <div>
-          <label htmlFor="max-dimension" className="mb-2 block text-xs font-semibold text-slate-700">Maximum dimensions</label>
+          <label htmlFor="max-dimension" className="mb-2 block text-xs font-semibold text-ink">Maximum dimensions</label>
           <select
             id="max-dimension"
             value={maxDimension}
             onChange={(event) => setMaxDimension(Number(event.target.value))}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
           >
             <option value={0}>Original dimensions</option>
             <option value={1920}>Max 1920px (Full HD)</option>
@@ -246,7 +246,7 @@ export default function ImageCompressorTool() {
             type="button"
             disabled={rawFiles.length === 0 || isProcessing}
             onClick={() => void runBatchCompression(rawFiles, { quality: quality / 100, maxDimension })}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-line"
           >
             {isProcessing ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
             {isProcessing ? 'Compressing…' : 'Apply & re-compress'}
@@ -265,12 +265,12 @@ export default function ImageCompressorTool() {
           type="button"
           disabled={isProcessing || rawFiles.length >= MAX_FILES}
           onClick={() => fileInputRef.current?.click()}
-          className="block w-full rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 p-8 text-center transition hover:border-indigo-500 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
+          className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-8 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
         >
-          <UploadCloud className="mx-auto mb-3 h-11 w-11 text-indigo-600" aria-hidden="true" />
-          <span className="block font-bold text-slate-900">Drop images here or click to browse</span>
-          <span className="mt-1 block text-xs text-slate-500">PNG, JPG, or WebP · Up to {MAX_FILES} images · 50 MB per file · 150 MB total</span>
-          {rawFiles.length > 0 && <span className="mt-2 block text-xs font-semibold text-indigo-700">{rawFiles.length} of {MAX_FILES} selected</span>}
+          <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
+          <span className="block font-bold text-ink">Drop images here or click to browse</span>
+          <span className="mt-1 block text-xs text-muted">PNG, JPG, or WebP · Up to {MAX_FILES} images · 50 MB per file · 150 MB total</span>
+          {rawFiles.length > 0 && <span className="mt-2 block text-xs font-semibold text-brand">{rawFiles.length} of {MAX_FILES} selected</span>}
         </button>
         <input
           ref={fileInputRef}
@@ -287,16 +287,16 @@ export default function ImageCompressorTool() {
         />
       </div>
 
-      <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3.5 py-3 text-xs leading-relaxed text-slate-600">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-        <p><strong className="text-slate-700">Private by design.</strong> Image data is processed on your device; nothing is uploaded. Large images may take a moment to process.</p>
+      <div className="flex items-start gap-2 rounded-lg bg-paper px-3.5 py-3 text-xs leading-relaxed text-muted">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+        <p><strong className="text-ink">Private by design.</strong> Image data is processed on your device; nothing is uploaded. Large images may take a moment to process.</p>
       </div>
 
       {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
       {errorMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMsg}</p>}
 
       {isProcessing && (
-        <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800" role="status" aria-live="polite">
+        <div className="flex items-center gap-3 rounded-xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
           Compressing {rawFiles.length} {rawFiles.length === 1 ? 'image' : 'images'}… Keep this tab open until processing is complete.
         </div>
@@ -304,12 +304,12 @@ export default function ImageCompressorTool() {
 
       {items.length > 0 && (
         <section className="space-y-4" aria-label="Compressed images">
-          <div className="flex flex-col justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+          <div className="flex flex-col justify-between gap-4 rounded-xl border border-brand/20 bg-brand-soft px-4 py-4 sm:flex-row sm:items-center sm:px-5">
             <div className="flex items-center gap-2.5">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
               <div className="text-sm">
-                <p className="font-bold text-slate-900">{totalSavedPercent > 0 ? `Saved ${formatBytes(totalOriginal - totalCompressed)} (${totalSavedPercent}%)` : 'Your images are ready'}</p>
-                <p className="mt-0.5 text-xs text-slate-600">{formatBytes(totalOriginal)} total <span aria-hidden="true">→</span> {formatBytes(totalCompressed)} · {items.length} {items.length === 1 ? 'image' : 'images'}</p>
+                <p className="font-bold text-ink">{totalSavedPercent > 0 ? `Saved ${formatBytes(totalOriginal - totalCompressed)} (${totalSavedPercent}%)` : 'Your images are ready'}</p>
+                <p className="mt-0.5 text-xs text-muted">{formatBytes(totalOriginal)} total <span aria-hidden="true">→</span> {formatBytes(totalCompressed)} · {items.length} {items.length === 1 ? 'image' : 'images'}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -317,7 +317,7 @@ export default function ImageCompressorTool() {
                 type="button"
                 onClick={() => void handleDownloadZip()}
                 disabled={isZipping}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60 sm:flex-none"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60 sm:flex-none"
               >
                 {isZipping ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Archive className="h-4 w-4" aria-hidden="true" />}
                 {isZipping ? 'Preparing ZIP…' : 'Download All (.ZIP)'}
@@ -325,31 +325,31 @@ export default function ImageCompressorTool() {
               <button
                 type="button"
                 onClick={handleClearAll}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2.5 text-xs font-semibold text-ink transition hover:bg-paper"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" /> Clear all
               </button>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
             {items.map((item) => (
               <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <img src={item.previewUrl} alt={`Preview of ${item.originalFile.name}`} className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50 object-cover" />
+                  <img src={item.previewUrl} alt={`Preview of ${item.originalFile.name}`} className="h-12 w-12 shrink-0 rounded-lg border border-line bg-paper object-cover" />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900" title={item.originalFile.name}>{item.originalFile.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{formatBytes(item.originalSize)} <span aria-hidden="true">→</span> <span className="font-semibold text-slate-800">{formatBytes(item.compressedSize)}</span></p>
+                    <p className="truncate text-sm font-semibold text-ink" title={item.originalFile.name}>{item.originalFile.name}</p>
+                    <p className="mt-0.5 text-xs text-muted">{formatBytes(item.originalSize)} <span aria-hidden="true">→</span> <span className="font-semibold text-ink">{formatBytes(item.compressedSize)}</span></p>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.savedPercent > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.savedPercent > 0 ? 'bg-brand-soft text-brand-dark' : 'bg-paper text-muted'}`}>
                     {item.savedPercent > 0 ? `-${item.savedPercent}%` : 'Original'}
                   </span>
                   <a
                     href={item.previewUrl}
                     download={item.originalFile.name}
-                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 sm:px-3"
+                    className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-2 text-xs font-semibold text-brand hover:bg-brand-soft sm:px-3"
                     aria-label={`Download ${item.originalFile.name}`}
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" /> <span className="hidden sm:inline">Save</span>
@@ -358,7 +358,7 @@ export default function ImageCompressorTool() {
               </article>
             ))}
           </div>
-          <p className="flex items-center gap-1.5 text-xs text-slate-500"><FileImage className="h-3.5 w-3.5" aria-hidden="true" /> Original files are kept when compression would make an image larger.</p>
+          <p className="flex items-center gap-1.5 text-xs text-muted"><FileImage className="h-3.5 w-3.5" aria-hidden="true" /> Original files are kept when compression would make an image larger.</p>
         </section>
       )}
     </div>

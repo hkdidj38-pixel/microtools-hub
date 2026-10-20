@@ -2,16 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+@layer base {
+  :root {
+    color-scheme: light;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    --hub-ink: #15251d;
+    --hub-muted: #64746a;
+    --hub-paper: #f5f7f2;
+    --hub-surface: #ffffff;
+    --hub-line: #e1e8e0;
+    --hub-brand: #286247;
+    --hub-brand-dark: #1d5039;
+    --hub-lime: #d9f27a;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+    background: var(--hub-paper);
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background: var(--hub-paper);
+    color: var(--hub-ink);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid rgb(87 139 73 / 45%);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: #d9f27a;
+    color: #15251d;
+  }
 }
 
-html { scroll-behavior: smooth; }
-body { min-width: 320px; margin: 0; }
-button, input, select { font: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid rgba(79, 70, 229, .4);
-  outline-offset: 2px;
+@layer components {
+  .hub-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .hub-card {
+    @apply rounded-3xl border border-line bg-white shadow-soft;
+  }
+
+  .hub-eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.16em] text-brand;
+  }
+
+  .hub-input {
+    @apply w-full rounded-2xl border border-line bg-white px-4 py-3.5 text-sm text-ink shadow-sm placeholder:text-muted/70 transition focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10;
+  }
+
+  .hub-button-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/25 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .hub-button-secondary {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-brand/30 hover:bg-paper focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

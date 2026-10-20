@@ -21,12 +21,13 @@
     </script>
     <link rel="stylesheet" href="/css/styles.css">
 </head>
-<body>
+<body class="legacy-page">
+    <a class="skip-link" href="#main-content">Skip to tool</a>
     <header>
-        <nav>
+        <nav aria-label="Main navigation">
             <a href="/" class="logo">MicroTools Hub</a>
             <div class="nav-links">
-                <a href="/word-counter/">Word Counter</a>
+                <a href="/word-counter/" aria-current="page">Word Counter</a>
                 <a href="/text-converter/">Text Converter</a>
                 <a href="/json-formatter/">JSON Formatter</a>
                 <a href="/slug-generator/">Slug Generator</a>
@@ -35,7 +36,7 @@
         </nav>
     </header>
 
-    <main>
+    <main id="main-content">
         <div class="tool-container">
             <div class="tool-header">
                 <h1>Word Counter</h1>

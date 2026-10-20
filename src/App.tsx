@@ -1,105 +1,274 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Braces,
+  FileImage,
+  FileStack,
+  Globe2,
+  Hash,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Type,
+  WandSparkles,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { BrowserRouter, Link, Route, Routes, useParams } from 'react-router-dom';
-import { ArrowRight, Search, Shield, Sparkles } from 'lucide-react';
 import { TOOLS_REGISTRY } from '@/lib/registry';
 import { ToolLayout } from '@/components/ToolLayout';
 
 const legacyTools = [
-  { name: 'Word Counter', slug: 'word-counter' },
-  { name: 'Text Converter', slug: 'text-converter' },
-  { name: 'JSON Formatter', slug: 'json-formatter' },
-  { name: 'Slug Generator', slug: 'slug-generator' },
-];
+  { name: 'Word Counter', slug: 'word-counter', description: 'Count words, characters, sentences, and reading time.', icon: Type },
+  { name: 'Text Converter', slug: 'text-converter', description: 'Switch between readable and developer-friendly casing.', icon: WandSparkles },
+  { name: 'JSON Formatter', slug: 'json-formatter', description: 'Format, minify, and validate JSON in your browser.', icon: Braces },
+  { name: 'Slug Generator', slug: 'slug-generator', description: 'Turn a title into a clean, shareable URL slug.', icon: Hash },
+] satisfies { name: string; slug: string; description: string; icon: LucideIcon }[];
+
+const toolIcons: Record<string, LucideIcon> = {
+  'image-compressor': FileImage,
+  'pdf-merger': FileStack,
+  'url-screenshot': Globe2,
+};
 
 function HomePage() {
   const [query, setQuery] = useState('');
-  const normalizedQuery = query.trim().toLowerCase();
-  const filtered = TOOLS_REGISTRY.filter((tool) =>
-    [tool.name, tool.description, tool.category, ...tool.keywords]
-      .some((value) => value.toLowerCase().includes(normalizedQuery)),
+  const [selectedCategory, setSelectedCategory] = useState('All tools');
+  const categories = useMemo(
+    () => ['All tools', ...Array.from(new Set(TOOLS_REGISTRY.map((tool) => tool.category))).sort((a, b) => a.localeCompare(b))],
+    [],
   );
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredTools = useMemo(() => TOOLS_REGISTRY.filter((tool) => {
+    const matchesCategory = selectedCategory === 'All tools' || tool.category === selectedCategory;
+    const matchesQuery = !normalizedQuery || [tool.name, tool.description, tool.category, ...tool.keywords]
+      .some((value) => value.toLowerCase().includes(normalizedQuery));
+    return matchesCategory && matchesQuery;
+  }), [normalizedQuery, selectedCategory]);
+  const categoryCount = categories.length - 1;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-14 text-center sm:py-16">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700">
-            <Shield className="h-3.5 w-3.5" aria-hidden="true" /> 100% In-Browser Execution · Zero Cloud Uploads
+    <div className="min-h-screen bg-paper text-ink">
+      <a href="#main-content" className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+        Skip to content
+      </a>
+      <header className="sticky top-0 z-40 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
+        <nav className="hub-container flex h-[4.5rem] items-center justify-between gap-5" aria-label="Main navigation">
+          <Link to="/" className="group inline-flex shrink-0 items-center gap-3 rounded-xl" aria-label="MicroTools Hub home">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6">
+              <Sparkles className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="text-base font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
+          </Link>
+          <div className="flex items-center gap-2 sm:gap-6">
+            <a href="#toolbox" className="hidden text-sm font-semibold text-muted transition hover:text-brand sm:inline-flex">Explore tools</a>
+            <a href="#classic-tools" className="hidden text-sm font-semibold text-muted transition hover:text-brand md:inline-flex">Classic utilities</a>
+            <a href="#privacy" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-white px-3.5 text-xs font-bold text-ink transition hover:border-brand/30 hover:text-brand sm:px-4 sm:text-sm">
+              <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />
+              <span>Privacy first</span>
+            </a>
           </div>
-          <div className="mb-2 flex items-center justify-center gap-2 text-indigo-600">
-            <Sparkles className="h-6 w-6" aria-hidden="true" />
-            <span className="font-bold">MicroTools Hub</span>
-          </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">Fast, private micro-tools</h1>
-          <p className="mx-auto mt-3 max-w-2xl text-lg text-slate-600">
-            Useful browser tools that keep your files and data on your device. No uploads, accounts, or waiting.
-          </p>
-          <div className="relative mx-auto mt-8 max-w-lg">
-            <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <label className="sr-only" htmlFor="tool-search">Search tools</label>
-            <input
-              id="tool-search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search tools (e.g. compress, PNG)..."
-              className="w-full rounded-xl border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-            />
-          </div>
-        </div>
+        </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="text-xl font-bold text-slate-900">Browse tools</h2>
-          <span className="text-sm text-slate-500">{filtered.length} {filtered.length === 1 ? 'tool' : 'tools'}</span>
-        </div>
-        {filtered.length > 0 ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((tool) => (
-              <Link
-                className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-md"
-                key={tool.slug}
-                to={`/tools/${tool.slug}`}
-              >
-                <div>
-                  <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-indigo-600">{tool.category}</span>
-                  <h3 className="mt-3 text-lg font-bold text-slate-900 transition group-hover:text-indigo-600">{tool.name}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{tool.description}</p>
-                </div>
-                <div className="mt-5 flex items-center border-t border-slate-100 pt-4 text-xs font-semibold text-indigo-600">
-                  Open tool <ArrowRight className="ml-1 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">No tools match “{query}”. Try a different search.</p>
-        )}
+      <main id="main-content">
+        <section className="relative isolate overflow-hidden bg-ink text-white">
+          <div className="pointer-events-none absolute -right-32 -top-52 h-[30rem] w-[30rem] rounded-full border border-white/10" aria-hidden="true" />
+          <div className="pointer-events-none absolute -right-16 -top-36 h-[22rem] w-[22rem] rounded-full border border-white/10" aria-hidden="true" />
+          <div className="pointer-events-none absolute right-[12%] top-16 h-28 w-28 rounded-full bg-brand/40 blur-3xl" aria-hidden="true" />
+          <div className="hub-container relative grid gap-12 py-14 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:py-24">
+            <div className="max-w-3xl">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-lime sm:text-xs">
+                <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_14px_rgba(217,242,122,.75)]" />
+                A calmer kind of toolbox
+              </div>
+              <h1 className="max-w-3xl text-4xl font-black leading-[1.04] tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+                Small tools.<br /><span className="text-lime">Serious momentum.</span>
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-7 text-white/70 sm:text-lg sm:leading-8">
+                The useful little utilities that turn busywork into done—without the clutter, accounts, or unnecessary uploads.
+              </p>
+              <a href="#toolbox" className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-lime px-5 py-3 text-sm font-extrabold text-ink shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-[#e3f99a] focus-visible:outline-white">
+                Find your next tool <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <p className="mt-5 flex items-center gap-2 text-xs text-white/55">
+                <ShieldCheck className="h-4 w-4 text-lime" aria-hidden="true" />
+                Files and text stay in your browser; URL inspection is disclosed before its edge fetch.
+              </p>
+            </div>
 
-        <section className="mt-12 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-bold text-slate-900">Classic tools</h2>
-          <p className="mt-1 text-sm text-slate-600">More free, private utilities from MicroTools Hub.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {legacyTools.map((tool) => (
-              <a key={tool.slug} href={`/${tool.slug}/`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-700">{tool.name}</a>
-            ))}
+            <aside className="relative mx-auto w-full max-w-md lg:ml-auto" aria-label="Toolbox overview">
+              <div className="absolute -inset-4 rounded-[2.5rem] bg-white/[0.04] blur-xl" aria-hidden="true" />
+              <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/[0.07] p-5 shadow-2xl backdrop-blur-sm sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">Your utility shelf</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-white">Ready when you are.</p>
+                  </div>
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime text-ink"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                    <p className="text-3xl font-black tracking-tight text-lime">{TOOLS_REGISTRY.length}</p>
+                    <p className="mt-1 text-xs font-medium text-white/60">React tools</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                    <p className="text-3xl font-black tracking-tight text-lime">{categoryCount}</p>
+                    <p className="mt-1 text-xs font-medium text-white/60">Real categories</p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {TOOLS_REGISTRY.slice(0, 3).map((tool) => {
+                    const Icon = toolIcons[tool.slug] ?? Sparkles;
+                    return (
+                      <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-lime/40 hover:bg-white/[0.08]">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lime"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-white">{tool.name}</span>
+                          <span className="mt-0.5 block truncate text-xs text-white/50">{tool.category}</span>
+                        </span>
+                        <ArrowUpRight className="h-4 w-4 shrink-0 text-white/35 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-lime" aria-hidden="true" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="toolbox" className="hub-container scroll-mt-24 py-14 sm:py-20">
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div className="max-w-2xl">
+              <p className="hub-eyebrow">The good stuff</p>
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">Find the right tool.</h2>
+              <p className="mt-3 text-sm leading-6 text-muted sm:text-base">A small, focused collection for the tasks that interrupt your flow.</p>
+            </div>
+            <div className="w-full lg:max-w-md">
+              <label htmlFor="tool-search" className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-muted">Search the toolbox</label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden="true" />
+                {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-muted hover:bg-paper hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /></button>}
+                <input
+                  id="tool-search"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Try PDF, compress, or headers…"
+                  className="hub-input min-h-14 pl-12 pr-12 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-7 flex flex-wrap gap-2" role="group" aria-label="Filter tools by category">
+            {categories.map((category) => {
+              const active = category === selectedCategory;
+              const count = category === 'All tools'
+                ? TOOLS_REGISTRY.length
+                : TOOLS_REGISTRY.filter((tool) => tool.category === category).length;
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
+                >
+                  {category}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/15 text-lime' : 'bg-paper text-muted'}`}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mb-4 mt-8 flex items-center justify-between gap-4">
+            <p className="text-sm font-bold text-ink" aria-live="polite">{filteredTools.length} {filteredTools.length === 1 ? 'tool' : 'tools'} to explore</p>
+            {(query || selectedCategory !== 'All tools') && <button type="button" onClick={() => { setQuery(''); setSelectedCategory('All tools'); }} className="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand">Clear filters</button>}
+          </div>
+
+          {filteredTools.length ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredTools.map((tool) => {
+                const Icon = toolIcons[tool.slug] ?? Sparkles;
+                return (
+                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-h-[16rem] flex-col rounded-[1.75rem] border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand transition group-hover:bg-lime group-hover:text-ink"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                      <span className="rounded-full bg-paper px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">{tool.category}</span>
+                    </div>
+                    <div className="mt-6 flex-1">
+                      <h3 className="text-lg font-extrabold tracking-tight text-ink group-hover:text-brand">{tool.name}</h3>
+                      <p className="mt-2 text-sm leading-6 text-muted">{tool.description}</p>
+                    </div>
+                    <span className="mt-5 inline-flex items-center gap-2 text-xs font-extrabold text-brand">Open tool <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-line bg-white px-6 py-14 text-center">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><Search className="h-5 w-5" aria-hidden="true" /></span>
+              <h3 className="mt-4 text-lg font-extrabold text-ink">Nothing in this search.</h3>
+              <p className="mt-1 text-sm text-muted">Try a different phrase or reset your filters.</p>
+              <button type="button" onClick={() => { setQuery(''); setSelectedCategory('All tools'); }} className="hub-button-secondary mt-5">Show every tool</button>
+            </div>
+          )}
+        </section>
+
+        <section id="classic-tools" className="hub-container scroll-mt-24 pb-14 sm:pb-20">
+          <div className="rounded-[2rem] border border-line bg-white p-5 shadow-soft sm:p-8">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <p className="hub-eyebrow">Still useful. Still here.</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-ink sm:text-3xl">Classic utilities</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-muted">The original quick helpers, kept lightweight and right where you left them.</p>
+              </div>
+              <span className="text-xs font-bold text-muted">{legacyTools.length} standalone pages</span>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {legacyTools.map(({ name, slug, description, icon: Icon }) => (
+                <a key={slug} href={`/${slug}/`} className="group rounded-2xl border border-line bg-paper/70 p-4 transition hover:border-brand/25 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-white text-brand shadow-sm transition group-hover:bg-brand group-hover:text-white"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                  <span className="mt-4 flex items-center justify-between gap-2 text-sm font-extrabold text-ink">{name}<ArrowUpRight className="h-4 w-4 text-muted transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand" aria-hidden="true" /></span>
+                  <span className="mt-1 block text-xs leading-5 text-muted">{description}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="privacy" className="hub-container scroll-mt-24 pb-16 sm:pb-20">
+          <div className="grid gap-5 rounded-[2rem] bg-brand-soft p-6 sm:p-8 lg:grid-cols-[auto_1fr] lg:items-start">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
+            <div>
+              <p className="hub-eyebrow">Privacy, without the fine print</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-ink">Your files stay yours.</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Image, PDF, and text utilities run in your browser. The URL inspector is different: it sends the URL you enter to a Cloudflare Function to fetch limited page metadata. It does not forward your browser cookies or authorization headers.</p>
+              <a href="#toolbox" className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand hover:underline">Back to the toolbox <ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
+            </div>
           </div>
         </section>
       </main>
+
+      <footer className="border-t border-line bg-white">
+        <div className="hub-container flex flex-col gap-3 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-bold text-ink">MicroTools Hub <span className="font-normal text-muted">· Thoughtful little tools for everyday work.</span></p>
+          <p>Built for the browser. URL inspection uses a disclosed edge fetch.</p>
+        </div>
+      </footer>
     </div>
   );
 }
 
 function NotFoundPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-      <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">404 · Page not found</p>
-      <h1 className="mt-2 text-3xl font-extrabold text-slate-900">We couldn’t find that page</h1>
-      <p className="mt-2 max-w-md text-slate-600">The address may be incorrect, or this tool may have moved.</p>
-      <Link className="mt-6 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700" to="/">
-        Browse all tools
-      </Link>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-paper p-6 text-center">
+      <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand"><Search className="h-6 w-6" aria-hidden="true" /></span>
+      <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.18em] text-brand">404 · Missing in action</p>
+      <h1 className="mt-2 text-3xl font-black tracking-tight text-ink">That page wandered off.</h1>
+      <p className="mt-2 max-w-md text-sm leading-6 text-muted">The address may be incorrect, or this tool may have moved.</p>
+      <Link className="hub-button-primary mt-6" to="/">Browse all tools <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
     </main>
   );
 }
@@ -110,10 +279,11 @@ function ToolRoute() {
 
   if (!tool) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
-        <h1 className="text-2xl font-bold text-slate-900">Tool not found</h1>
-        <p className="mt-2 text-slate-600">That tool may have moved or the address may be incorrect.</p>
-        <Link className="mt-4 font-medium text-indigo-600 hover:underline" to="/">Return to all tools</Link>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-paper p-4 text-center">
+        <p className="hub-eyebrow">404 · Tool not found</p>
+        <h1 className="mt-2 text-2xl font-black text-ink">That tool isn’t on the shelf.</h1>
+        <p className="mt-2 text-sm text-muted">It may have moved, or the URL may be misspelled.</p>
+        <Link className="hub-button-secondary mt-5" to="/">Return to MicroTools Hub</Link>
       </div>
     );
   }
@@ -121,7 +291,7 @@ function ToolRoute() {
   const { Component } = tool;
   return (
     <ToolLayout meta={tool}>
-      <Suspense fallback={<div className="py-16 text-center text-sm text-slate-500">Loading tool engine…</div>}>
+      <Suspense fallback={<div className="py-16 text-center text-sm text-muted" role="status">Loading tool…</div>}>
         <Component />
       </Suspense>
     </ToolLayout>
