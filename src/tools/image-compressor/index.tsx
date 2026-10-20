@@ -90,7 +90,6 @@ export default function ImageCompressorTool() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const itemsRef = useRef<CompressedItem[]>([]);
   const runIdRef = useRef(0);
   const zipRunIdRef = useRef(0);
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -102,8 +101,6 @@ export default function ImageCompressorTool() {
   };
 
   const replaceItems = (next: CompressedItem[]) => {
-    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
-    itemsRef.current = next;
     setItems(next);
   };
 
@@ -111,8 +108,6 @@ export default function ImageCompressorTool() {
     runIdRef.current += 1;
     zipRunIdRef.current += 1;
     batchAbortRef.current?.abort();
-    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
-    itemsRef.current = [];
     revokeTemporaryDownloadUrls();
   }, []);
 
@@ -132,7 +127,6 @@ export default function ImageCompressorTool() {
       for (const file of filesToProcess) {
         const compressedBlob = await compressSingleImage(file, options, controller.signal);
         if (runId !== runIdRef.current) {
-          results.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
           return;
         }
         const savedPercent = file.size > 0
@@ -142,7 +136,6 @@ export default function ImageCompressorTool() {
           id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 9)}`,
           originalFile: file,
           compressedBlob,
-          downloadUrl: URL.createObjectURL(compressedBlob),
           originalSize: file.size,
           compressedSize: compressedBlob.size,
           savedPercent,
@@ -151,7 +144,6 @@ export default function ImageCompressorTool() {
 
       if (runId === runIdRef.current) replaceItems(results);
     } catch (error) {
-      results.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
       if (runId === runIdRef.current && !controller.signal.aborted) {
         setErrorMsg(error instanceof Error ? error.message : 'Could not compress one or more images.');
       }
@@ -223,6 +215,29 @@ export default function ImageCompressorTool() {
     setErrorMsg(null);
     setNotice(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleImageDownload = (item: CompressedItem) => {
+    let downloadUrl: string | null = null;
+    let anchor: HTMLAnchorElement | null = null;
+    try {
+      downloadUrl = URL.createObjectURL(item.compressedBlob);
+      temporaryDownloadUrlsRef.current.add(downloadUrl);
+      anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = item.originalFile.name;
+      document.body.appendChild(anchor);
+      anchor.click();
+    } catch {
+      setErrorMsg(`Could not download ${item.originalFile.name}. Please try again.`);
+    } finally {
+      anchor?.remove();
+      if (downloadUrl) {
+        window.setTimeout(() => {
+          if (temporaryDownloadUrlsRef.current.delete(downloadUrl!)) URL.revokeObjectURL(downloadUrl!);
+        }, 30_000);
+      }
+    }
   };
 
   const handleDownloadZip = async () => {
@@ -403,14 +418,14 @@ export default function ImageCompressorTool() {
                   <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.savedPercent > 0 ? 'bg-brand-soft text-brand-dark' : 'bg-paper text-muted'}`}>
                     {item.savedPercent > 0 ? `-${item.savedPercent}%` : 'Original'}
                   </span>
-                  <a
-                    href={item.downloadUrl}
-                    download={item.originalFile.name}
+                  <button
+                    type="button"
+                    onClick={() => handleImageDownload(item)}
                     className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-2 text-xs font-semibold text-brand hover:bg-brand-soft sm:px-3"
                     aria-label={`Download ${item.originalFile.name}`}
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" /> <span className="hidden sm:inline">Save</span>
-                  </a>
+                  </button>
                 </div>
               </article>
             ))}
