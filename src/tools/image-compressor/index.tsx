@@ -221,7 +221,7 @@ export default function ImageCompressorTool() {
     let downloadUrl: string | null = null;
     let anchor: HTMLAnchorElement | null = null;
     try {
-      downloadUrl = URL.createObjectURL(item.compressedBlob);
+      downloadUrl = URL.createObjectURL(new Blob([item.compressedBlob], { type: 'application/octet-stream' }));
       temporaryDownloadUrlsRef.current.add(downloadUrl);
       anchor = document.createElement('a');
       anchor.href = downloadUrl;
