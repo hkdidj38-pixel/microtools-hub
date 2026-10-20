@@ -336,7 +336,7 @@ export default function ImageCompressorTool() {
             {items.map((item) => (
               <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <img src={item.previewUrl} alt={`Preview of ${item.originalFile.name}`} className="h-12 w-12 shrink-0 rounded-lg border border-line bg-paper object-cover" />
+                  <img src={item.previewUrl} alt="Compressed image preview" className="h-12 w-12 shrink-0 rounded-lg border border-line bg-paper object-cover" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink" title={item.originalFile.name}>{item.originalFile.name}</p>
                     <p className="mt-0.5 text-xs text-muted">{formatBytes(item.originalSize)} <span aria-hidden="true">→</span> <span className="font-semibold text-ink">{formatBytes(item.compressedSize)}</span></p>
