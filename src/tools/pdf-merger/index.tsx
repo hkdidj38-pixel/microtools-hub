@@ -245,7 +245,7 @@ export default function PdfMergerTool() {
           if (!isMerging) addFiles(event.dataTransfer.files);
         }}
         onClick={() => !isMerging && fileInputRef.current?.click()}
-        className={`rounded-2xl border-2 border-dashed p-8 text-center transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 sm:p-10 ${isMerging ? 'cursor-not-allowed border-line bg-paper opacity-60' : 'cursor-pointer border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
+        className={`rounded-2xl border-2 border-dashed p-5 text-center transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 sm:p-10 ${isMerging ? 'cursor-not-allowed border-line bg-paper opacity-60' : 'cursor-pointer border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
       >
         <input
           ref={fileInputRef}

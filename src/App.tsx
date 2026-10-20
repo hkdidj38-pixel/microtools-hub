@@ -54,18 +54,18 @@ function HomePage() {
         Skip to content
       </a>
       <header className="sticky top-0 z-40 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
-        <nav className="hub-container flex h-[4.5rem] items-center justify-between gap-5" aria-label="Main navigation">
-          <Link to="/" className="group inline-flex shrink-0 items-center gap-3 rounded-xl" aria-label="MicroTools Hub home">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6">
-              <Sparkles className="h-5 w-5" aria-hidden="true" />
+        <nav className="hub-container flex h-16 items-center justify-between gap-2 sm:h-[4.5rem] sm:gap-5" aria-label="Main navigation">
+          <Link to="/" className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-xl sm:gap-3" aria-label="MicroTools Hub home">
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6 sm:h-10 sm:w-10 sm:rounded-2xl">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
             </span>
-            <span className="text-base font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
+            <span className="text-sm font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-6">
+          <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-6">
             <a href="#toolbox" className="hidden text-sm font-semibold text-muted transition hover:text-brand sm:inline-flex">Explore tools</a>
             <a href="#classic-tools" className="hidden text-sm font-semibold text-muted transition hover:text-brand md:inline-flex">Classic utilities</a>
-            <a href="#privacy" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-white px-3.5 text-xs font-bold text-ink transition hover:border-brand/30 hover:text-brand sm:px-4 sm:text-sm">
-              <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />
+            <a href="#privacy" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 text-[11px] font-bold text-ink transition hover:border-brand/30 hover:text-brand sm:min-h-10 sm:gap-2 sm:px-4 sm:text-sm">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand sm:h-4 sm:w-4" aria-hidden="true" />
               <span>Privacy first</span>
             </a>
           </div>
@@ -77,44 +77,44 @@ function HomePage() {
           <div className="pointer-events-none absolute -right-32 -top-52 h-[30rem] w-[30rem] rounded-full border border-white/10" aria-hidden="true" />
           <div className="pointer-events-none absolute -right-16 -top-36 h-[22rem] w-[22rem] rounded-full border border-white/10" aria-hidden="true" />
           <div className="pointer-events-none absolute right-[12%] top-16 h-28 w-28 rounded-full bg-brand/40 blur-3xl" aria-hidden="true" />
-          <div className="hub-container relative grid gap-12 py-14 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:py-24">
-            <div className="max-w-3xl">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-lime sm:text-xs">
+          <div className="hub-container relative grid min-w-0 gap-8 py-10 sm:gap-12 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:py-24">
+            <div className="w-full min-w-0 max-w-3xl">
+              <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-lime sm:mb-6 sm:px-3.5 sm:text-xs sm:tracking-[0.16em]">
                 <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_14px_rgba(217,242,122,.75)]" />
                 A calmer kind of toolbox
               </div>
-              <h1 className="max-w-3xl text-4xl font-black leading-[1.04] tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+              <h1 className="max-w-full text-[clamp(1.75rem,8.2vw,3rem)] font-black leading-[1.06] tracking-[-0.04em] [overflow-wrap:anywhere] sm:text-5xl lg:text-6xl">
                 Small tools.<br /><span className="text-lime">Serious momentum.</span>
               </h1>
-              <p className="mt-6 max-w-xl text-base leading-7 text-white/70 sm:text-lg sm:leading-8">
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/70 sm:mt-6 sm:text-lg sm:leading-8">
                 The useful little utilities that turn busywork into done—without the clutter, accounts, or unnecessary uploads.
               </p>
-              <a href="#toolbox" className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-lime px-5 py-3 text-sm font-extrabold text-ink shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-[#e3f99a] focus-visible:outline-white">
+              <a href="#toolbox" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-extrabold text-ink shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-[#e3f99a] focus-visible:outline-white sm:mt-8 sm:min-h-12 sm:rounded-2xl sm:px-5 sm:py-3">
                 Find your next tool <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </a>
-              <p className="mt-5 flex items-center gap-2 text-xs text-white/55">
-                <ShieldCheck className="h-4 w-4 text-lime" aria-hidden="true" />
-                Files and text stay in your browser; URL inspection is disclosed before its edge fetch.
+              <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-white/55 sm:mt-5">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden="true" />
+                <span>Files and text stay in your browser; URL inspection is disclosed before its edge fetch.</span>
               </p>
             </div>
 
-            <aside className="relative mx-auto w-full max-w-md lg:ml-auto" aria-label="Toolbox overview">
+            <aside className="relative mx-auto w-full min-w-0 max-w-md lg:ml-auto" aria-label="Toolbox overview">
               <div className="absolute -inset-4 rounded-[2.5rem] bg-white/[0.04] blur-xl" aria-hidden="true" />
-              <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/[0.07] p-5 shadow-2xl backdrop-blur-sm sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
+              <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.07] p-4 shadow-2xl backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
+                <div className="flex items-start justify-between gap-3 sm:gap-4">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">Your utility shelf</p>
-                    <p className="mt-2 text-2xl font-black tracking-tight text-white">Ready when you are.</p>
+                    <p className="mt-2 break-words text-xl font-black tracking-tight text-white sm:text-2xl">Ready when you are.</p>
                   </div>
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime text-ink"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
                 </div>
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-                    <p className="text-3xl font-black tracking-tight text-lime">{TOOLS_REGISTRY.length}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3">
+                  <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
+                    <p className="text-2xl font-black tracking-tight text-lime sm:text-3xl">{TOOLS_REGISTRY.length}</p>
                     <p className="mt-1 text-xs font-medium text-white/60">React tools</p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-                    <p className="text-3xl font-black tracking-tight text-lime">{categoryCount}</p>
+                  <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
+                    <p className="text-2xl font-black tracking-tight text-lime sm:text-3xl">{categoryCount}</p>
                     <p className="mt-1 text-xs font-medium text-white/60">Real categories</p>
                   </div>
                 </div>
@@ -138,14 +138,14 @@ function HomePage() {
           </div>
         </section>
 
-        <section id="toolbox" className="hub-container scroll-mt-24 py-14 sm:py-20">
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-            <div className="max-w-2xl">
+        <section id="toolbox" className="hub-container min-w-0 scroll-mt-20 py-10 sm:scroll-mt-24 sm:py-20">
+          <div className="flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end">
+            <div className="min-w-0 max-w-2xl">
               <p className="hub-eyebrow">The good stuff</p>
-              <h2 className="mt-3 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">Find the right tool.</h2>
+              <h2 className="mt-3 text-[clamp(1.65rem,7vw,2.25rem)] font-black tracking-[-0.035em] text-ink sm:text-4xl">Find the right tool.</h2>
               <p className="mt-3 text-sm leading-6 text-muted sm:text-base">A small, focused collection for the tasks that interrupt your flow.</p>
             </div>
-            <div className="w-full lg:max-w-md">
+            <div className="w-full min-w-0 lg:max-w-md">
               <label htmlFor="tool-search" className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-muted">Search the toolbox</label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden="true" />
@@ -156,7 +156,7 @@ function HomePage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Try PDF, compress, or headers…"
-                  className="hub-input min-h-14 pl-12 pr-12 text-sm"
+                  className="hub-input min-h-12 pl-12 pr-12 text-sm sm:min-h-14"
                 />
               </div>
             </div>
@@ -174,7 +174,7 @@ function HomePage() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setSelectedCategory(category)}
-                  className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
+                  className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 sm:gap-2 sm:px-4 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
                 >
                   {category}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/15 text-lime' : 'bg-paper text-muted'}`}>{count}</span>
                 </button>
@@ -192,16 +192,16 @@ function HomePage() {
               {filteredTools.map((tool) => {
                 const Icon = toolIcons[tool.slug] ?? Sparkles;
                 return (
-                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-h-[16rem] flex-col rounded-[1.75rem] border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:p-6">
+                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-w-0 flex-col rounded-3xl border border-line bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:min-h-[16rem] sm:rounded-[1.75rem] sm:p-6">
                     <div className="flex items-start justify-between gap-4">
                       <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand transition group-hover:bg-lime group-hover:text-ink"><Icon className="h-5 w-5" aria-hidden="true" /></span>
                       <span className="rounded-full bg-paper px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">{tool.category}</span>
                     </div>
-                    <div className="mt-6 flex-1">
-                      <h3 className="text-lg font-extrabold tracking-tight text-ink group-hover:text-brand">{tool.name}</h3>
+                    <div className="mt-4 min-w-0 flex-1 sm:mt-6">
+                      <h3 className="break-words text-lg font-extrabold tracking-tight text-ink group-hover:text-brand">{tool.name}</h3>
                       <p className="mt-2 text-sm leading-6 text-muted">{tool.description}</p>
                     </div>
-                    <span className="mt-5 inline-flex items-center gap-2 text-xs font-extrabold text-brand">Open tool <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
+                    <span className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand sm:mt-5">Open tool <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
                   </Link>
                 );
               })}
@@ -216,8 +216,8 @@ function HomePage() {
           )}
         </section>
 
-        <section id="classic-tools" className="hub-container scroll-mt-24 pb-14 sm:pb-20">
-          <div className="rounded-[2rem] border border-line bg-white p-5 shadow-soft sm:p-8">
+        <section id="classic-tools" className="hub-container min-w-0 scroll-mt-20 pb-10 sm:scroll-mt-24 sm:pb-20">
+          <div className="min-w-0 rounded-3xl border border-line bg-white p-4 shadow-soft sm:rounded-[2rem] sm:p-8">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
                 <p className="hub-eyebrow">Still useful. Still here.</p>
@@ -226,11 +226,11 @@ function HomePage() {
               </div>
               <span className="text-xs font-bold text-muted">{legacyTools.length} standalone pages</span>
             </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid min-w-0 gap-2.5 sm:mt-6 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
               {legacyTools.map(({ name, slug, description, icon: Icon }) => (
-                <a key={slug} href={`/${slug}/`} className="group rounded-2xl border border-line bg-paper/70 p-4 transition hover:border-brand/25 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-white text-brand shadow-sm transition group-hover:bg-brand group-hover:text-white"><Icon className="h-5 w-5" aria-hidden="true" /></span>
-                  <span className="mt-4 flex items-center justify-between gap-2 text-sm font-extrabold text-ink">{name}<ArrowUpRight className="h-4 w-4 text-muted transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand" aria-hidden="true" /></span>
+                <a key={slug} href={`/${slug}/`} className="group min-w-0 rounded-2xl border border-line bg-paper/70 p-3 transition hover:border-brand/25 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:p-4">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-brand shadow-sm transition group-hover:bg-brand group-hover:text-white sm:h-10 sm:w-10"><Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" /></span>
+                  <span className="mt-3 flex min-w-0 items-center justify-between gap-2 text-sm font-extrabold text-ink sm:mt-4">{name}<ArrowUpRight className="h-4 w-4 shrink-0 text-muted transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand" aria-hidden="true" /></span>
                   <span className="mt-1 block text-xs leading-5 text-muted">{description}</span>
                 </a>
               ))}
@@ -238,8 +238,8 @@ function HomePage() {
           </div>
         </section>
 
-        <section id="privacy" className="hub-container scroll-mt-24 pb-16 sm:pb-20">
-          <div className="grid gap-5 rounded-[2rem] bg-brand-soft p-6 sm:p-8 lg:grid-cols-[auto_1fr] lg:items-start">
+        <section id="privacy" className="hub-container min-w-0 scroll-mt-20 pb-12 sm:scroll-mt-24 sm:pb-20">
+          <div className="grid min-w-0 gap-4 rounded-3xl bg-brand-soft p-4 sm:gap-5 sm:rounded-[2rem] sm:p-8 lg:grid-cols-[auto_1fr] lg:items-start">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
             <div>
               <p className="hub-eyebrow">Privacy, without the fine print</p>

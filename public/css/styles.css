@@ -38,15 +38,18 @@
 }
 
 html {
-    min-width: 320px;
+    width: 100%;
+    min-width: 0;
     scroll-behavior: smooth;
-    scroll-padding-top: 6rem;
+    scroll-padding-top: 5rem;
 }
 
 body {
-    min-width: 320px;
+    width: 100%;
+    min-width: 0;
     min-height: 100vh;
     margin: 0;
+    overflow-wrap: anywhere;
     background:
         radial-gradient(circle at 90% 8%, rgba(217, 242, 122, 0.12), transparent 24rem),
         var(--bg-color);
@@ -449,16 +452,34 @@ footer {
 }
 
 @media (max-width: 700px) {
-    header { padding: 0.7rem 0.8rem; }
-    nav { align-items: flex-start; flex-direction: column; gap: 0.4rem; }
-    .nav-links { width: 100%; justify-content: flex-start; gap: 0.1rem; }
-    .nav-links a { padding: 0.45rem 0.55rem; font-size: 0.7rem; }
-    .theme-toggle { margin-left: auto; padding-inline: 0.7rem; }
-    main { width: min(100% - 1.1rem, 1120px); margin-top: 1.6rem; }
-    .hero { margin-bottom: 1.8rem; }
-    .tool-container { border-radius: 1.35rem; }
+    header { position: static; padding: 0.45rem 0.7rem; }
+    nav { min-height: 2.5rem; align-items: center; gap: 0.35rem; }
+    .logo { gap: 0.45rem; font-size: 0.88rem; }
+    .logo::before { width: 2rem; height: 2rem; border-radius: 0.7rem; font-size: 1rem; }
+    .nav-links {
+        width: auto;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        gap: 0.15rem;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        padding-bottom: 0.1rem;
+        scrollbar-width: thin;
+    }
+    .nav-links a { flex: 0 0 auto; padding: 0.4rem 0.45rem; font-size: 0.68rem; white-space: nowrap; }
+    .theme-toggle { flex: 0 0 auto; min-height: 2.2rem; margin-left: 0.15rem; padding: 0.35rem 0.55rem; font-size: 0.68rem; white-space: nowrap; }
+    main { width: min(100% - 1rem, 1120px); margin: 1.25rem auto 2.5rem; }
+    .hero { margin-bottom: 1.5rem; }
+    .tool-container { border-radius: 1.25rem; padding: 1rem; }
+    .tool-header { margin-bottom: 1.25rem; padding-bottom: 1rem; }
+    .tool-header p { margin-top: 0.65rem; font-size: 0.9rem; }
+    textarea { min-height: 180px; }
+    .tool-card { padding: 1.15rem; }
     .button-group .btn { flex: 1 1 130px; }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .result-area { overflow-wrap: anywhere; }
 }
 
 @media (prefers-reduced-motion: reduce) {
