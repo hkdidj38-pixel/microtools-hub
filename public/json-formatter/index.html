@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Formatter & Validator - Beautify JSON Online | MicroTools Hub</title>
+    <meta name="description" content="Free online JSON formatter and validator. Pretty-print, minify, and validate JSON with instant error detection. Private and instant.">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/" class="logo">MicroTools Hub</a>
+            <div class="nav-links">
+                <a href="/word-counter/">Word Counter</a>
+                <a href="/text-converter/">Text Converter</a>
+                <a href="/json-formatter/">JSON Formatter</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <div class="tool-container">
+            <div class="tool-header">
+                <h1>JSON Formatter &amp; Validator</h1>
+                <p>Paste your JSON below to format, minify, or validate it. All processing happens locally in your browser.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="json-input">Your JSON</label>
+                <textarea id="json-input" placeholder='{"name": "MicroTools", "tools": ["word counter", "json formatter"]}' autofocus></textarea>
+            </div>
+
+            <div class="button-group">
+                <button id="format-btn" class="btn btn-primary" type="button">Format / Beautify</button>
+                <button id="minify-btn" class="btn btn-primary" type="button">Minify</button>
+                <button id="validate-btn" class="btn btn-primary" type="button">Validate</button>
+                <button id="copy-btn" class="btn btn-secondary" type="button">Copy Result</button>
+                <button id="clear-btn" class="btn btn-secondary" type="button">Clear</button>
+            </div>
+
+            <p id="status" role="status" aria-live="polite" style="margin-top: 1rem;"></p>
+
+            <div class="form-group" id="output-group" style="margin-top: 1.5rem; display: none;">
+                <label for="json-output">Result</label>
+                <textarea id="json-output" readonly></textarea>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 MicroTools Hub. All processing is local to your browser.</p>
+    </footer>
+    <script src="/js/json-formatter.js"></script>
+</body>
+</html>
