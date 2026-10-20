@@ -4,7 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MicroTools Hub - Fast, Private, Online Productivity Tools</title>
-    <meta name="description" content="Free, privacy-focused online tools for developers and writers. Word counter, JSON formatter, text converter, and more.">
+    <meta name="description" content="Free, privacy-focused online tools for developers and writers. Word counter, JSON formatter, text converter, slug generator, and more.">
+    <script>
+        // Apply the saved theme before paint to avoid a flash of the wrong theme.
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (!t) {
+                    t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -15,6 +29,8 @@
                 <a href="/word-counter/">Word Counter</a>
                 <a href="/text-converter/">Text Converter</a>
                 <a href="/json-formatter/">JSON Formatter</a>
+                <a href="/slug-generator/">Slug Generator</a>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
             </div>
         </nav>
     </header>
@@ -38,11 +54,16 @@
                 <h2>JSON Formatter</h2>
                 <p>Format, beautify, and validate your JSON data with instant error detection.</p>
             </a>
+            <a href="/slug-generator/" class="tool-card">
+                <h2>Slug Generator</h2>
+                <p>Turn any title into a clean, SEO-friendly URL slug with custom separators and length limits.</p>
+            </a>
         </div>
     </main>
 
     <footer>
         <p>&copy; 2023 MicroTools Hub. All processing is local to your browser.</p>
     </footer>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text Case Converter - Uppercase, Lowercase, Title Case | MicroTools Hub</title>
     <meta name="description" content="Free online text case converter. Convert text to UPPERCASE, lowercase, Title Case, camelCase, snake_case, and more. Private and instant.">
+    <script>
+        // Apply the saved theme before paint to avoid a flash of the wrong theme.
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (!t) {
+                    t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -15,6 +29,8 @@
                 <a href="/word-counter/">Word Counter</a>
                 <a href="/text-converter/">Text Converter</a>
                 <a href="/json-formatter/">JSON Formatter</a>
+                <a href="/slug-generator/">Slug Generator</a>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
             </div>
         </nav>
     </header>
@@ -55,6 +71,7 @@
     <footer>
         <p>&copy; 2023 MicroTools Hub. All processing is local to your browser.</p>
     </footer>
+    <script src="/js/theme.js"></script>
     <script src="/js/text-converter.js"></script>
 </body>
 </html>
