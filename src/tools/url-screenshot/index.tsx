@@ -100,14 +100,14 @@ export default function UrlScreenshotTool() {
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
 
       <section aria-label="Edge telemetry terminal" className="overflow-hidden rounded-2xl border border-white/10 bg-[#111a15] shadow-lg">
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-white/10 bg-white/[0.04] px-3 py-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
             <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
             <span className="ml-2 font-mono text-xs font-semibold tracking-wide text-white/75">EDGE INSPECTOR</span>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">Cloudflare Pages Function</span>
+          <span className="max-w-full break-words text-right font-mono text-[9px] uppercase tracking-[0.1em] text-white/40 sm:text-[10px] sm:tracking-widest">Cloudflare Pages Function</span>
         </div>
 
         <div className="space-y-4 p-4 font-mono text-xs sm:p-5" aria-live="polite">

@@ -20,18 +20,33 @@
     --hub-lime: #d9f27a;
   }
 
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
   html {
+    width: 100%;
+    min-width: 0;
     scroll-behavior: smooth;
-    scroll-padding-top: 6rem;
+    scroll-padding-top: 5rem;
     background: var(--hub-paper);
   }
 
   body {
-    min-width: 320px;
+    width: 100%;
+    min-width: 0;
     min-height: 100vh;
     margin: 0;
     background: var(--hub-paper);
     color: var(--hub-ink);
+    overflow-wrap: anywhere;
+  }
+
+  #root {
+    min-width: 0;
+    min-height: 100vh;
   }
 
   button,
@@ -59,7 +74,7 @@
 
 @layer components {
   .hub-container {
-    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+    @apply mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8;
   }
 
   .hub-card {

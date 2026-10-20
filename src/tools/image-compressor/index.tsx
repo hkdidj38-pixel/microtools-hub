@@ -337,7 +337,7 @@ export default function ImageCompressorTool() {
           type="button"
           disabled={isProcessing || rawFiles.length >= MAX_FILES}
           onClick={() => fileInputRef.current?.click()}
-          className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-8 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
+          className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-5 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
         >
           <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
           <span className="block font-bold text-ink">Drop images here or click to browse</span>
