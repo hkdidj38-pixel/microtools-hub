@@ -23,6 +23,63 @@ import {
 const MAX_FILES = 50;
 const ACCEPTED_IMAGE = /\.(png|jpe?g|webp)$/i;
 
+const PREVIEW_SIZE = 96;
+
+function ImageThumbnail({ blob }: { blob: Blob }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let bitmap: ImageBitmap | null = null;
+
+    void createImageBitmap(blob).then((imageBitmap) => {
+      if (disposed) {
+        imageBitmap.close();
+        return;
+      }
+      bitmap = imageBitmap;
+      const canvas = canvasRef.current;
+      const context = canvas?.getContext('2d');
+      if (!canvas || !context) {
+        imageBitmap.close();
+        bitmap = null;
+        return;
+      }
+
+      const scale = Math.max(PREVIEW_SIZE / imageBitmap.width, PREVIEW_SIZE / imageBitmap.height);
+      const width = imageBitmap.width * scale;
+      const height = imageBitmap.height * scale;
+      canvas.width = PREVIEW_SIZE;
+      canvas.height = PREVIEW_SIZE;
+      context.clearRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+      context.drawImage(imageBitmap, (PREVIEW_SIZE - width) / 2, (PREVIEW_SIZE - height) / 2, width, height);
+      imageBitmap.close();
+      bitmap = null;
+    }).catch(() => {
+      bitmap?.close();
+      bitmap = null;
+      // The preview is decorative; the original download remains available if decoding fails.
+    });
+
+    return () => {
+      disposed = true;
+      bitmap?.close();
+    };
+  }, [blob]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={PREVIEW_SIZE}
+      height={PREVIEW_SIZE}
+      role="img"
+      aria-label="Compressed image preview"
+      className="h-12 w-12 shrink-0 rounded-lg border border-line bg-paper"
+    />
+  );
+}
+
+
 export default function ImageCompressorTool() {
   const [rawFiles, setRawFiles] = useState<File[]>([]);
   const [items, setItems] = useState<CompressedItem[]>([]);
@@ -45,7 +102,7 @@ export default function ImageCompressorTool() {
   };
 
   const replaceItems = (next: CompressedItem[]) => {
-    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
     itemsRef.current = next;
     setItems(next);
   };
@@ -54,7 +111,7 @@ export default function ImageCompressorTool() {
     runIdRef.current += 1;
     zipRunIdRef.current += 1;
     batchAbortRef.current?.abort();
-    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
     itemsRef.current = [];
     revokeTemporaryDownloadUrls();
   }, []);
@@ -75,7 +132,7 @@ export default function ImageCompressorTool() {
       for (const file of filesToProcess) {
         const compressedBlob = await compressSingleImage(file, options, controller.signal);
         if (runId !== runIdRef.current) {
-          results.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+          results.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
           return;
         }
         const savedPercent = file.size > 0
@@ -85,7 +142,7 @@ export default function ImageCompressorTool() {
           id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 9)}`,
           originalFile: file,
           compressedBlob,
-          previewUrl: URL.createObjectURL(compressedBlob),
+          downloadUrl: URL.createObjectURL(compressedBlob),
           originalSize: file.size,
           compressedSize: compressedBlob.size,
           savedPercent,
@@ -94,7 +151,7 @@ export default function ImageCompressorTool() {
 
       if (runId === runIdRef.current) replaceItems(results);
     } catch (error) {
-      results.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      results.forEach((item) => URL.revokeObjectURL(item.downloadUrl));
       if (runId === runIdRef.current && !controller.signal.aborted) {
         setErrorMsg(error instanceof Error ? error.message : 'Could not compress one or more images.');
       }
@@ -336,7 +393,7 @@ export default function ImageCompressorTool() {
             {items.map((item) => (
               <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <img src={item.previewUrl} alt="Compressed image preview" className="h-12 w-12 shrink-0 rounded-lg border border-line bg-paper object-cover" />
+                  <ImageThumbnail blob={item.compressedBlob} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink" title={item.originalFile.name}>{item.originalFile.name}</p>
                     <p className="mt-0.5 text-xs text-muted">{formatBytes(item.originalSize)} <span aria-hidden="true">→</span> <span className="font-semibold text-ink">{formatBytes(item.compressedSize)}</span></p>
@@ -347,7 +404,7 @@ export default function ImageCompressorTool() {
                     {item.savedPercent > 0 ? `-${item.savedPercent}%` : 'Original'}
                   </span>
                   <a
-                    href={item.previewUrl}
+                    href={item.downloadUrl}
                     download={item.originalFile.name}
                     className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-2 text-xs font-semibold text-brand hover:bg-brand-soft sm:px-3"
                     aria-label={`Download ${item.originalFile.name}`}

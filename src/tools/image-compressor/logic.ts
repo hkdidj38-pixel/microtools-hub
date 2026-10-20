@@ -11,7 +11,7 @@ export interface CompressedItem {
   id: string;
   originalFile: File;
   compressedBlob: Blob;
-  previewUrl: string;
+  downloadUrl: string;
   originalSize: number;
   compressedSize: number;
   savedPercent: number;
