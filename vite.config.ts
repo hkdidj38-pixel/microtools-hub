@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  server: { allowedHosts: ['.e2b.app'] },
   plugins: [react()],
   resolve: {
     alias: { '@': path.resolve(rootDir, './src') },
