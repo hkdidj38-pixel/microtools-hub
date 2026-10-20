@@ -1,6 +1,6 @@
 # MicroTools Hub — Project Handover
 
-> Evidence-based snapshot for the next coding assistant. Facts below were checked against the repository at `851125f` on branch `arena/0e543a0d-microtools-hub` (Arena branch status: active). The checked-in source is authoritative; deployment-dashboard settings and live production behavior were not available for inspection.
+> Updated 2026-10-20 from verified repository state at `0f2a8b9` on branch `arena/9bbb5c84-microtools-hub` (Arena branch status: active). The local Git history is a shallow/grafted snapshot. The checked-in source is authoritative; deployment-dashboard settings and live production behavior were not available for inspection.
 
 ## 1. Project overview
 
@@ -63,7 +63,7 @@ Versions above are from `package-lock.json`, not an assertion about production r
 └── PROJECT_CONTEXT.md                # This handover
 ```
 
-`node_modules/`, `dist/`, and `.wrangler/` are not source deliverables; generated output is ignored by Git.
+`node_modules/` and `dist/` are Git-ignored install/build artifacts. Wrangler may create `.wrangler/` locally; it is not listed in `.gitignore`, so verify `git status` before committing.
 
 ## 4. Features and pages
 
@@ -153,14 +153,14 @@ Potential deployment checks:
 
 ## 9. Current status and verification
 
-**Repository state observed before writing this file:** branch `arena/0e543a0d-microtools-hub`, Arena status active, `HEAD` `851125f` (`Merge pull request #5 from hkdidj38-pixel/arena/95389311-microtools-hub`), no pre-existing working-tree changes. No files were changed or discarded before creating this report.
+**Repository state observed before this update:** branch `arena/9bbb5c84-microtools-hub`, Arena status active, `HEAD` `0f2a8b9` (`Merge pull request #6 from hkdidj38-pixel/arena/0e543a0d-microtools-hub`), and a clean working tree. No pre-existing user changes were present or discarded.
 
 **Commands run in this session:**
 
 - `npm ci` — passed; installed 165 packages. npm reported **7 audit advisories: 2 moderate, 5 high**. No dependency versions were altered by `npm ci`.
 - `npm run build` — passed: TypeScript check, Vite build, prerendered all 3 React tool pages and generated an 8-URL sitemap.
 - Strict manual `tsc` check of `functions/api/screenshot.ts` — passed.
-- `git diff --check` — passed before this report was created.
+- `git diff --check` — passed after refreshing this report in the current session.
 
 Earlier implementation-session verification also included mocked handler smoke tests (metadata extraction, URL-query redaction, credential non-forwarding, blocked IP/private target, unsafe redirect) and a local Wrangler Pages preview that successfully inspected GitHub. That preview is not running now. These checks do not amount to exhaustive browser or production testing.
 
@@ -181,11 +181,11 @@ No exact build/test failure is currently known. A full dependency audit triage, 
 
 ## 11. GitHub and version control
 
-- Current branch: `arena/0e543a0d-microtools-hub` (active for this session; do not switch or rename it).
-- Current HEAD: `851125f`, a merge commit for PR #5 (URL inspector).
-- Previous feature commit before merge: `b22635c Add URL screenshot edge inspector`.
-- PR #5 was merged in the prior conversation. The local `main`/`origin/main` refs point to the current merge commit in this checkout.
-- Working tree was clean before this report. After creation, `PROJECT_CONTEXT.md` is the intended sole workspace change.
+- Current branch: `arena/9bbb5c84-microtools-hub` (Arena marks it active; do not switch or rename it).
+- Current HEAD: `0f2a8b9`, with commit message `Merge pull request #6 from hkdidj38-pixel/arena/0e543a0d-microtools-hub`.
+- PR #6 (the project context report) and PR #5 (URL inspector) were merged in the prior conversation. The URL inspector implementation commit was `b22635c Add URL screenshot edge inspector`.
+- Local Git history is shallow/grafted; local `main`/`origin/main` point to `0f2a8b9` in this checkout.
+- Working tree was clean before this context refresh. This refresh changes only `PROJECT_CONTEXT.md`.
 - Preserve user changes; do not reset, clean, or overwrite files.
 
 ## 12. Next steps
