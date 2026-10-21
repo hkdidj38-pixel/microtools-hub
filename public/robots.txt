@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://microtools-hub.pages.dev/sitemap.xml
+Sitemap: https://microtools-hub-d6l.pages.dev/sitemap.xml
