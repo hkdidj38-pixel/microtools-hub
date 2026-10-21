@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 
-const SITE_URL = (process.env.SITE_URL || 'https://microtools-hub.pages.dev').replace(/\/$/, '');
+const SITE_URL = (process.env.SITE_URL || 'https://microtools-hub-d6l.pages.dev').replace(/\/$/, '');
 const distDir = path.resolve('dist');
 const toolsDir = path.resolve('src/tools');
 const indexHtmlPath = path.join(distDir, 'index.html');
@@ -120,8 +120,19 @@ for (const folder of folders) {
   console.log(`[prerender] Generated /tools/${slug}/index.html`);
 }
 
-const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapUrls
+const uniqueSitemapUrls = [...new Set(sitemapUrls)];
+const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${uniqueSitemapUrls
   .map((url) => `  <url><loc>${xmlEsc(url)}</loc></url>`)
   .join('\n')}\n</urlset>\n`;
 fs.writeFileSync(path.join(distDir, 'sitemap.xml'), sitemap, 'utf8');
-console.log(`[prerender] Generated sitemap.xml (${sitemapUrls.length} URLs)`);
+
+const robotsPath = path.join(distDir, 'robots.txt');
+if (fs.existsSync(robotsPath)) {
+  const robotsLines = fs.readFileSync(robotsPath, 'utf8')
+    .split(/\r?\n/)
+    .filter((line) => !/^sitemap\s*:/i.test(line));
+  robotsLines.push(`Sitemap: ${SITE_URL}/sitemap.xml`);
+  fs.writeFileSync(robotsPath, `${robotsLines.join('\n').trimEnd()}\n`, 'utf8');
+}
+
+console.log(`[prerender] Generated sitemap.xml (${uniqueSitemapUrls.length} URLs)`);
