@@ -1,0 +1,35 @@
+# CI: validate that the production build compiles before changes reach main.
+# This workflow only builds; it does NOT deploy. Cloudflare Pages remains the
+# sole production deployment system (build command `npm run build`, output `dist`).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # npm ci installs exactly from the committed package-lock.json (lockfileVersion 3)
+      # and fails on any lockfile/package.json mismatch. No extra cache configuration.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
