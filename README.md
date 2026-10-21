@@ -27,7 +27,7 @@ The development server serves the React tool library at `/` and retains the clas
 npm run build
 ```
 
-This runs TypeScript checks, creates a Vite static build in `dist/`, pre-renders each registered tool's SEO page, and writes `dist/sitemap.xml`. Cloudflare Pages should use `npm run build` as the build command and `dist` as the output directory. Set `SITE_URL` during the build if deploying to a domain other than `https://microtools-hub.pages.dev`.
+This runs TypeScript checks, creates a Vite static build in `dist/`, pre-renders each registered tool's SEO page, and writes `dist/sitemap.xml`. Cloudflare Pages should use `npm run build` as the build command and `dist` as the output directory. The default `SITE_URL` is `https://microtools-hub-d6l.pages.dev`; set it during the build only when deploying to a different domain.
 
 ## Adding a tool
 
