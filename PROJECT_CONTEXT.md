@@ -106,7 +106,7 @@ There is no database or application-level persistence. Static theme choice is st
 
 No `.env*` file or `.env.example` was found. No secret is required by the inspected source.
 
-- `SITE_URL` — optional **build-time** value used by `scripts/prerender.mjs` for canonical URLs and generated sitemap entries. Default: `https://microtools-hub.pages.dev`.
+- `SITE_URL` — optional **build-time** value used by `scripts/prerender.mjs` for canonical URLs, generated sitemap entries, and the built `robots.txt` sitemap directive. Default: `https://microtools-hub-d6l.pages.dev`.
 - The Pages Function reads `context.request.cf.colo` and `.country` from the Cloudflare request context; these are runtime request properties, not configured secrets/environment variables.
 
 `vite.config.ts` configures React, `@` → `src`, host allowance for `.e2b.app`, `upng-js` dependency optimization, and ESNext build output. `tsconfig.json` is strict and includes only `src/`, not `functions/`.
@@ -147,7 +147,7 @@ No `wrangler.toml`, `wrangler.json[c]`, Netlify/Vercel config, Dockerfile, deplo
 Potential deployment checks:
 
 - `public/_redirects` is `/* /index.html 200`. In a previous local Wrangler Pages run, Wrangler warned it detected an infinite loop and ignored this rule. Direct home and prerendered tool-page requests returned 200 in that run, but fallback behavior should be checked on Pages.
-- `public/robots.txt` hardcodes the default Pages sitemap URL. Changing `SITE_URL` changes generated sitemap/canonical tags but does not update this static robots file.
+- `public/robots.txt` is the checked-in static source and hardcodes the current production sitemap URL. After Vite copies public assets, `scripts/prerender.mjs` replaces the `Sitemap:` line in `dist/robots.txt` with the value derived from `SITE_URL`.
 - Build emits `dist/sitemap.xml` containing the root, four static pages, and discovered React tools (8 URLs at current inventory); checked-in `public/sitemap.xml` is a separate older static file.
 - The `functions/` code is not included in the app’s regular TypeScript build or a repository test suite.
 
@@ -174,7 +174,7 @@ No exact build/test failure is currently known. A full dependency audit triage, 
 4. **No screenshot image:** `url-screenshot` is a metadata/header inspector only. Align name/product wording or scope a separate screenshot feature; do not buffer large binaries in the Worker.
 5. **Build validation gap:** `tsc` includes only `src`, so Pages Function types are not checked by `npm run build`. Add a stable function type-check/test path if appropriate.
 6. **Documentation drift:** README lists image compression and the four legacy tools, but omits PDF merger and URL inspector. Its privacy section says tools process user content locally and says there is no runtime service; that needs qualification for URL inspection.
-7. **Sitemap/domain drift:** static `robots.txt` always points to `microtools-hub.pages.dev`; custom-domain builds need matching robots/sitemap references.
+7. **Sitemap/domain deployment check:** verify Cloudflare Pages runs `npm run build` and publishes `dist/`; custom `SITE_URL` values are applied by the post-build prerender to the sitemap, canonicals, and built robots directive.
 8. **Test gap:** no unit, integration, e2e, lint, or browser test scripts are defined. Existing manual validation is narrow.
 9. **Local dev gap:** `npm run dev` and `npm run preview` do not host Pages Functions; without Wrangler, the URL API will not be available locally.
 10. **SEO/tool behavior:** the prerender’s no-JavaScript fallback contains static FAQ/description content but does not execute the React tool. This is expected for prerendering; ensure copy accurately describes each tool.
