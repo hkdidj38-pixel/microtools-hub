@@ -30,24 +30,24 @@
     }
 
     function toCamelCase(str) {
-        const words = splitWords(str.toLowerCase());
+        const words = splitWords(str).map(function (word) { return word.toLowerCase(); });
         return words.map(function (w, i) {
             return i === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1);
         }).join('');
     }
 
     function toPascalCase(str) {
-        return splitWords(str.toLowerCase()).map(function (w) {
-            return w.charAt(0).toUpperCase() + w.slice(1);
+        return splitWords(str).map(function (w) {
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
         }).join('');
     }
 
     function toSnakeCase(str) {
-        return splitWords(str.toLowerCase()).join('_');
+        return splitWords(str).join('_').toLowerCase();
     }
 
     function toKebabCase(str) {
-        return splitWords(str.toLowerCase()).join('-');
+        return splitWords(str).join('-').toLowerCase();
     }
 
     function toToggleCase(str) {

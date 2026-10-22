@@ -1,7 +1,7 @@
 export const meta = {
   slug: 'image-compressor',
   name: 'Image Compressor (PNG, JPG, WebP)',
-  description: 'Compress PNG, JPG, and WebP images up to 80% directly in your browser. Private client-side compression with batch ZIP download.',
+  description: 'Compress PNG, JPG, and WebP images directly in your browser. Private client-side compression with batch ZIP download; savings depend on the image and settings.',
   category: 'Images',
   keywords: [
     'compress png',
