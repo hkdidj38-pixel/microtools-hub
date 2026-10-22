@@ -1,5 +1,3 @@
-import JSZip from 'jszip';
-
 export interface CompressionOptions {
   /** A value from 0.1 to 1.0. */
   quality: number;
@@ -148,7 +146,7 @@ export async function compressSingleImage(
   return resultBlob.size < file.size ? resultBlob : file;
 }
 
-function uniqueZipEntryName(originalName: string, usedNames: Set<string>): string {
+export function uniqueZipEntryName(originalName: string, usedNames: Set<string>): string {
   const safeName = (originalName || 'image').replace(/[\\/]/g, '_');
   const dot = safeName.lastIndexOf('.');
   const stem = dot > 0 ? safeName.slice(0, dot) : safeName;
@@ -164,6 +162,9 @@ function uniqueZipEntryName(originalName: string, usedNames: Set<string>): strin
 }
 
 export async function generateBatchZip(items: CompressedItem[]): Promise<Blob> {
+  // JSZip is loaded on demand so it is only downloaded when a ZIP is requested,
+  // not when the tool first opens.
+  const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const usedNames = new Set<string>();
   items.forEach((item) => {
