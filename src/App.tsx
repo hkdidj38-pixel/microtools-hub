@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -18,6 +18,7 @@ import {
 import { BrowserRouter, Link, Route, Routes, useParams } from 'react-router-dom';
 import { TOOLS_REGISTRY } from '@/lib/registry';
 import { ToolLayout } from '@/components/ToolLayout';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const legacyTools = [
   { name: 'Word Counter', slug: 'word-counter', description: 'Count words, characters, sentences, and reading time.', icon: Type },
@@ -291,9 +292,11 @@ function ToolRoute() {
   const { Component } = tool;
   return (
     <ToolLayout meta={tool}>
-      <Suspense fallback={<div className="py-16 text-center text-sm text-muted" role="status">Loading tool…</div>}>
-        <Component />
-      </Suspense>
+      <ErrorBoundary resetKeys={[tool.slug]} label={tool.name}>
+        <Suspense fallback={<div className="py-16 text-center text-sm text-muted" role="status">Loading tool…</div>}>
+          <Component />
+        </Suspense>
+      </ErrorBoundary>
     </ToolLayout>
   );
 }
