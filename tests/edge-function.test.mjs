@@ -9,13 +9,14 @@ const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
-function handler(fetch, timers = {}) {
+function handler(fetch, timers = {}, envOverrides = {}) {
   const context = vm.createContext({
     exports: {}, URL, Request, Response, TextDecoder, AbortController, Set,
-    fetch, setTimeout, clearTimeout, ...timers,
+    fetch() { throw new Error('Direct network access is forbidden'); }, setTimeout, clearTimeout, ...timers,
   });
   new vm.Script(compiled, { filename: 'screenshot.cjs' }).runInContext(context);
   return (target) => context.exports.onRequestGet({
+    env: { URL_INSPECTOR_ALLOWED_HOSTS: 'example.com', URL_INSPECTOR_EGRESS: { fetch }, ...envOverrides },
     request: new Request(`https://app.invalid/api/screenshot${target === undefined ? '' : `?url=${encodeURIComponent(target)}`}`, {
       headers: { Cookie: 'session=fixture', Authorization: 'Bearer fixture' },
     }),
@@ -125,4 +126,134 @@ test('timeout abort returns 504 and the configured budget is 8 seconds', async (
     clearTimeout() {},
   })('https://example.com');
   assert.equal(response.status, 504);
+});
+
+test('missing or malformed security configuration fails closed without egress', async () => {
+  const policies = [undefined, '', '*', '*.example.com', 'example.com,', 'example.com/path',
+    'example.com:443', 'user@example.com', 'localhost', '127.0.0.1', '.example.com',
+    '-bad.com', 'bad..com', 'éxample.com', 'a'.repeat(8193)];
+  for (const policy of policies) {
+    const response = await handler(() => assert.fail('Egress must not run'), {}, {
+      URL_INSPECTOR_ALLOWED_HOSTS: policy,
+    })('https://example.com');
+    assert.equal(response.status, 503, String(policy));
+  }
+  const missing = await handler(() => assert.fail('No fallback'), {}, {
+    URL_INSPECTOR_EGRESS: undefined,
+  })('https://example.com');
+  assert.equal(missing.status, 503);
+});
+
+test('exact allowlist rejects arbitrary DNS, subdomains and suffix tricks', async () => {
+  for (const target of ['https://attacker.com', 'https://sub.example.com',
+    'https://example.com.attacker.com', 'https://example-com.attacker.com']) {
+    const response = await handler(() => assert.fail('Unapproved DNS must not be contacted'))(target);
+    assert.equal(response.status, 403);
+  }
+  let called;
+  const response = await handler(async url => { called = url; return html(); })('https://EXAMPLE.com./');
+  assert.equal(response.status, 200);
+  assert.equal(called, 'https://example.com/');
+});
+
+test('private, link-local, metadata, obfuscated IP and unsupported protocol inputs are rejected', async () => {
+  for (const target of ['https://10.0.0.1', 'https://172.16.0.1', 'https://192.168.1.1',
+    'https://169.254.169.254', 'https://100.100.100.200', 'https://0x7f000001',
+    'https://2130706433', 'https://0177.0.0.1', 'https://[::ffff:127.0.0.1]',
+    'https://[fd00::1]', 'https://[fe80::1]', 'https://metadata.google.internal',
+    'file:///etc/passwd', 'ftp://example.com', 'data:text/plain,test']) {
+    assert.equal((await handler(() => assert.fail('No outbound request'))(target)).status, 400, target);
+  }
+});
+
+test('each redirect is independently allowlisted before egress', async () => {
+  for (const destination of ['https://attacker.com', 'https://169.254.169.254',
+    'https://sub.example.com', 'http://example.com', 'https://user:secret@example.com']) {
+    let calls = 0;
+    const response = await handler(async () => {
+      calls++;
+      return new Response(null, { status: 302, headers: { location: destination } });
+    })('https://example.com');
+    assert.equal(response.status, 502);
+    assert.equal(calls, 1);
+  }
+});
+
+test('egress quota/unavailable responses fail closed and do not expose service details', async () => {
+  for (const status of [429, 503]) {
+    const response = await handler(async () => new Response('private quota details', { status }))('https://example.com');
+    assert.equal(response.status, status);
+    assert.doesNotMatch(await response.text(), /private quota details/);
+  }
+});
+
+test('deadline bounds a stalled fetch even if the service ignores abort', async () => {
+  let timeout;
+  const run = handler(() => new Promise(() => {}), {
+    setTimeout(callback) { timeout = callback; return 1; }, clearTimeout() {},
+  });
+  const pending = run('https://example.com');
+  timeout();
+  assert.equal((await pending).status, 504);
+});
+
+test('deadline bounds stalled HTML reads and cancellation', async () => {
+  let timeout;
+  let reading;
+  const started = new Promise(resolve => { reading = resolve; });
+  const run = handler(async () => new Response(new ReadableStream({
+    pull() { reading(); return new Promise(() => {}); },
+    cancel() { return new Promise(() => {}); },
+  }), { headers: { 'Content-Type': 'text/html' } }), {
+    setTimeout(callback) { timeout = callback; return 1; }, clearTimeout() {},
+  });
+  const pending = run('https://example.com');
+  await started;
+  await new Promise(resolve => setImmediate(resolve));
+  timeout();
+  assert.equal((await pending).status, 504);
+});
+
+test('stalled non-HTML cancellation does not delay the response', async () => {
+  const response = await handler(async () => new Response(new ReadableStream({
+    cancel() { return new Promise(() => {}); },
+  }), { headers: { 'Content-Type': 'image/png' } }))('https://example.com');
+  assert.equal(response.status, 200);
+});
+
+test('per-isolate concurrency is bounded and released after requests finish', async () => {
+  const releases = [];
+  const run = handler(() => new Promise(resolve => { releases.push(() => resolve(html())); }));
+  const pending = Array.from({ length: 4 }, () => run('https://example.com'));
+  assert.equal((await run('https://example.com')).status, 429);
+  assert.equal(releases.length, 4);
+  releases.forEach(release => release());
+  assert.deepEqual((await Promise.all(pending)).map(response => response.status), [200, 200, 200, 200]);
+  const next = run('https://example.com');
+  releases.at(-1)();
+  assert.equal((await next).status, 200);
+});
+
+test('malformed and oversized metadata tags remain bounded', async () => {
+  for (const markup of ['<meta'.repeat(100000), '<title>'.repeat(60000),
+    `<meta ${'x'.repeat(500000)}>`, `<meta name="description" content="${'x'.repeat(20000)}">`]) {
+    const response = await handler(async () => html(markup))('https://example.com');
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.title, null);
+    assert.equal(payload.description, null);
+  }
+});
+
+test('endless empty stream chunks are capped and cancelled', async () => {
+  let reads = 0;
+  let cancelled = false;
+  const response = await handler(async () => new Response(new ReadableStream({
+    pull(controller) { reads++; controller.enqueue(new Uint8Array()); },
+    cancel() { cancelled = true; },
+  }), { headers: { 'Content-Type': 'text/html' } }))('https://example.com');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).bodyTruncated, true);
+  assert.ok(reads <= 2049); // Stream implementations may prefetch one chunk.
+  assert.equal(cancelled, true);
 });

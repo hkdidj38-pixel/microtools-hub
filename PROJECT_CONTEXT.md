@@ -1,3 +1,18 @@
+# MicroTools Hub — Security and Readiness Follow-up
+
+Follow-up date: 2026-10-22 UTC. Changes extend `f02b2fa14b79237ece4910314e84ea0b5da411f6` on `coderabbit/report-verification-audit`; the PDF, camelCase, Function typing and prior documentation fixes are preserved. **Ready for code/security review, not production deployment.**
+
+- **URL inspector containment:** exact approved-host policy and required `URL_INSPECTOR_EGRESS` service binding; no direct fetch fallback. Missing configuration returns 503. Each redirect is revalidated. Added hard response deadlines, bounded stream/tag processing and four-active-request per-isolate cap. See [SECURITY.md](SECURITY.md) for the service contract and mandatory acceptance checks. The service itself, connection-time DNS/IP restrictions and distributed quotas are **not implemented or verified here**. Activation remains blocked; the existing live deployment has not been changed.
+- **Dependencies:** exact Tailwind-scoped selector-parser override to 7.1.7 removes two moderate entries. This is a tested transitive major override, not a Tailwind major upgrade. Generated CSS is byte-identical for current inputs. Five high build-tool entries remain through one unpatched `braces` advisory. Full audit fails; production-dependency audit reports zero entries.
+- **Local validation:** build and Function tsc pass; 25/25 Node tests pass; 13/13 browser groups pass on retry; 16/16 route/layout checks pass. First follow-up browser attempt timed out waiting for development PDF count. Vite logged pdf-lib optimization/reload, but causation is not proven. The earlier audit's failed browser attempt is also preserved unchanged.
+- **Cloudflare evidence updated:** normal Chromium returned 200 for production and the existing branch preview. Production passed 16 route/layout checks and a benign `example.com` API inspection. Seven scripted app HTTP requests still returned 403/1010; an official Cloudflare documentation request did too. This establishes client/request-path-dependent behavior, not a blanket production outage. Exact security rule/client classification requires account event logs; no security setting or request identity was changed to bypass protections.
+- **Deployment evidence updated:** GitHub's Cloudflare check reports successful preview deployment of `f02b2fa` at `https://60651909.microtools-hub-d6l.pages.dev`. PR #20 also has an older successful preview comment. Empty GitHub deployments API output does not mean no deployment occurred. No new code was deployed in this follow-up. Push is withheld because this branch has automatic preview deployment evidence and the user requires explicit deployment confirmation.
+- **Evidence:** companion artifact directory `outputs/security-readiness/` contains the detailed report, per-file digest, command results, dependency table, HTTP/browser evidence and patch. `outputs/project-audit/` remains the earlier immutable audit bundle. No PR was opened, merged, or updated.
+
+## Historical audit snapshot — through f02b2fa
+
+The following audit is retained as historical evidence. Its counts, outstanding checks and deployment conclusions describe the earlier snapshot; the follow-up above supersedes them for current status. Earlier failures have not been removed.
+
 # MicroTools Hub — Report Verification and Stability Audit
 
 Audit date: 2026-10-22 UTC. Repository: `hkdidj38-pixel/microtools-hub` (active, not archived). Audited baseline: `main` at `a78ca5c9feafafc6eed44712a81b01b4230008a2`. Proposed corrections: branch `coderabbit/report-verification-audit`, based on a fetched, synchronized, initially clean checkout.
