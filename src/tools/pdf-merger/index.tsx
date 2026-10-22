@@ -70,6 +70,7 @@ export default function PdfMergerTool() {
 
   useEffect(() => {
     mountedRef.current = true;
+    estimateAbortRef.current = new AbortController();
     return () => {
       mountedRef.current = false;
       mergeTokenRef.current += 1;
@@ -141,13 +142,8 @@ export default function PdfMergerTool() {
         try {
           const pageCount = await estimatePdfPageCount(entry.file, estimateSignal);
           if (!mountedRef.current || estimateSignal.aborted) return;
-          const otherPages = pdfsRef.current.reduce((sum, current) =>
-            sum + (current.id !== entry.id ? current.pageCount ?? 0 : 0), 0);
-          const error = otherPages + pageCount > MAX_PDF_BATCH_PAGES
-            ? `The batch cannot exceed ${MAX_PDF_BATCH_PAGES.toLocaleString()} pages.`
-            : null;
           updatePdfs(pdfsRef.current.map((current) => current.id === entry.id
-            ? { ...current, pageCount, isEstimating: false, error }
+            ? { ...current, pageCount, isEstimating: false, error: null }
             : current));
         } catch {
           if (!mountedRef.current || estimateSignal.aborted) return;
@@ -191,7 +187,7 @@ export default function PdfMergerTool() {
   };
 
   const mergeAll = async () => {
-    if (pdfs.length < 2 || pdfs.some((entry) => entry.isEstimating || entry.error)) return;
+    if (!canMerge) return;
     const token = ++mergeTokenRef.current;
     const controller = new AbortController();
     mergeAbortRef.current = controller;
@@ -224,7 +220,8 @@ export default function PdfMergerTool() {
   const totalPages = pdfs.reduce((sum, entry) => sum + (entry.pageCount ?? 0), 0);
   const isEstimating = pdfs.some((entry) => entry.isEstimating);
   const hasInvalidPdf = pdfs.some((entry) => entry.error);
-  const canMerge = pdfs.length >= 2 && !isEstimating && !hasInvalidPdf && !isMerging;
+  const exceedsPageLimit = totalPages > MAX_PDF_BATCH_PAGES;
+  const canMerge = pdfs.length >= 2 && !isEstimating && !hasInvalidPdf && !exceedsPageLimit && !isMerging;
 
   return (
     <div className="tool-workspace space-y-6">
@@ -275,6 +272,7 @@ export default function PdfMergerTool() {
 
       {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
       {errorMessage && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMessage}</p>}
+      {exceedsPageLimit && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">The batch cannot exceed {MAX_PDF_BATCH_PAGES.toLocaleString()} pages. Remove files before merging.</p>}
 
       {pdfs.length > 0 && (
         <section aria-label="PDF merge order" className="space-y-4">

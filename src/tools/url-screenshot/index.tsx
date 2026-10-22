@@ -89,12 +89,12 @@ export default function UrlScreenshotTool() {
             {isLoading ? 'Inspecting…' : 'Inspect website'}
           </button>
         </div>
-        <p className="text-xs leading-relaxed text-muted">HTTPS only. Local/private hosts and unsafe redirects are blocked.</p>
+        <p className="text-xs leading-relaxed text-muted">Approved HTTPS hosts only. Inspection is unavailable until secure egress is configured.</p>
       </form>
 
       <div className="flex items-start gap-2.5 rounded-2xl border border-brand/15 bg-brand-soft px-4 py-3 text-xs leading-relaxed text-brand-dark">
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <p><strong>Edge fetch disclosure:</strong> The URL you submit is sent to this site’s Cloudflare Function, which fetches a small HTML prefix to read metadata. Your browser cookies and authorization headers are not forwarded. Avoid private URLs and URLs containing secrets.</p>
+        <p><strong>Edge fetch disclosure:</strong> The URL you submit is sent to this site’s Cloudflare Function, which uses a configured egress service to fetch a small HTML prefix from approved hosts. Your browser cookies and authorization headers are not forwarded. Avoid private URLs and URLs containing secrets.</p>
       </div>
 
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
