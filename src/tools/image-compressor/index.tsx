@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Archive,
   CheckCircle2,
@@ -86,6 +86,7 @@ export default function ImageCompressorTool() {
   const [quality, setQuality] = useState(80);
   const [maxDimension, setMaxDimension] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
   const [isZipping, setIsZipping] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -118,6 +119,7 @@ export default function ImageCompressorTool() {
     batchAbortRef.current = controller;
     const runId = ++runIdRef.current;
     replaceItems([]);
+    setProcessedCount(0);
     setIsProcessing(true);
     setErrorMsg(null);
     setNotice(null);
@@ -140,6 +142,7 @@ export default function ImageCompressorTool() {
           compressedSize: compressedBlob.size,
           savedPercent,
         });
+        if (runId === runIdRef.current) setProcessedCount(results.length);
       }
 
       if (runId === runIdRef.current) replaceItems(results);
@@ -202,12 +205,35 @@ export default function ImageCompressorTool() {
     void runBatchCompression(updatedFiles, { quality: quality / 100, maxDimension });
   };
 
+  const handleFilesSelectedRef = useRef(handleFilesSelected);
+  handleFilesSelectedRef.current = handleFilesSelected;
+  const isProcessingRef = useRef(isProcessing);
+  isProcessingRef.current = isProcessing;
+
+  // Paste images straight from the clipboard, unless the user is typing in a field.
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (isProcessingRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+        || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      const files = event.clipboardData?.files;
+      if (files && files.length > 0) {
+        event.preventDefault();
+        handleFilesSelectedRef.current(files);
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
+
   const handleClearAll = () => {
     runIdRef.current += 1;
     zipRunIdRef.current += 1;
     batchAbortRef.current?.abort();
     batchAbortRef.current = null;
     setIsProcessing(false);
+    setProcessedCount(0);
     setIsZipping(false);
     replaceItems([]);
     revokeTemporaryDownloadUrls();
@@ -340,7 +366,7 @@ export default function ImageCompressorTool() {
           className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-5 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
         >
           <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
-          <span className="block font-bold text-ink">Drop images here or click to browse</span>
+          <span className="block font-bold text-ink">Drop images here, paste from clipboard, or click to browse</span>
           <span className="mt-1 block text-xs text-muted">PNG, JPG, or WebP · Up to {MAX_FILES} images · 50 MB per file · 150 MB total</span>
           {rawFiles.length > 0 && <span className="mt-2 block text-xs font-semibold text-brand">{rawFiles.length} of {MAX_FILES} selected</span>}
         </button>
@@ -370,7 +396,7 @@ export default function ImageCompressorTool() {
       {isProcessing && (
         <div className="flex items-center gap-3 rounded-xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-          Compressing {rawFiles.length} {rawFiles.length === 1 ? 'image' : 'images'}… Keep this tab open until processing is complete.
+          Compressing image {Math.min(processedCount + 1, rawFiles.length)} of {rawFiles.length}… Keep this tab open until processing is complete.
         </div>
       )}
 
