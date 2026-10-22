@@ -13,6 +13,9 @@ self.onmessage = async (event: MessageEvent<PngWorkerRequest>) => {
   let canvas: OffscreenCanvas | undefined;
 
   try {
+    if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') {
+      throw new Error('This browser does not support in-browser PNG processing (OffscreenCanvas is unavailable). Try a current version of Chrome, Edge, Firefox, or Safari.');
+    }
     bitmap = await createImageBitmap(file);
     const pixelCount = bitmap.width * bitmap.height;
     if (pixelCount > 24_000_000) {
