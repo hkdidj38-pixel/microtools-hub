@@ -15,10 +15,11 @@ function handler(fetch, timers = {}, envOverrides = {}) {
     fetch() { throw new Error('Direct network access is forbidden'); }, setTimeout, clearTimeout, ...timers,
   });
   new vm.Script(compiled, { filename: 'screenshot.cjs' }).runInContext(context);
-  return (target) => context.exports.onRequestGet({
+  return (target, signal) => context.exports.onRequestGet({
     env: { URL_INSPECTOR_ALLOWED_HOSTS: 'example.com', URL_INSPECTOR_EGRESS: { fetch }, ...envOverrides },
     request: new Request(`https://app.invalid/api/screenshot${target === undefined ? '' : `?url=${encodeURIComponent(target)}`}`, {
       headers: { Cookie: 'session=fixture', Authorization: 'Bearer fixture' },
+      signal,
     }),
   });
 }
@@ -256,4 +257,86 @@ test('endless empty stream chunks are capped and cancelled', async () => {
   assert.equal((await response.json()).bodyTruncated, true);
   assert.ok(reads <= 2049); // Stream implementations may prefetch one chunk.
   assert.equal(cancelled, true);
+});
+
+test('pre-aborted callers never invoke the egress service', async () => {
+  const caller = new AbortController();
+  caller.abort();
+  const response = await handler(() => assert.fail('No egress for an abandoned request'))('https://example.com', caller.signal);
+  assert.equal(response.status, 499);
+  assert.match((await response.json()).error, /cancelled/);
+});
+
+test('caller abort bounds stalled headers, releases capacity and cancels late responses', { timeout: 2000 }, async () => {
+  const requests = [];
+  const run = handler((_url, options) => new Promise(resolve => requests.push({ resolve, signal: options.signal })));
+  const callers = Array.from({ length: 4 }, () => new AbortController());
+  const pending = callers.map(caller => run('https://example.com', caller.signal));
+  assert.equal((await run('https://example.com')).status, 429);
+  callers.forEach(caller => caller.abort());
+  assert.deepEqual((await Promise.all(pending)).map(response => response.status), [499, 499, 499, 499]);
+  assert.ok(requests.every(request => request.signal.aborted));
+
+  let cancelled = 0;
+  for (const request of requests) {
+    request.resolve(new Response(new ReadableStream({ cancel() { cancelled++; } })));
+  }
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cancelled, 4);
+  const next = run('https://example.com');
+  assert.equal(requests.length, 5);
+  requests.at(-1).resolve(html());
+  assert.equal((await next).status, 200);
+});
+
+test('caller abort bounds stalled body reads and stalled cancellation', { timeout: 2000 }, async () => {
+  const caller = new AbortController();
+  let serviceSignal;
+  let reading;
+  const started = new Promise(resolve => { reading = resolve; });
+  const run = handler(async (_url, options) => {
+    serviceSignal = options.signal;
+    return new Response(new ReadableStream({
+      pull() { reading(); return new Promise(() => {}); },
+      cancel() { return new Promise(() => {}); },
+    }), { headers: { 'Content-Type': 'text/html' } });
+  });
+  const pending = run('https://example.com', caller.signal);
+  await started;
+  await new Promise(resolve => setImmediate(resolve));
+  caller.abort();
+  assert.equal((await pending).status, 499);
+  assert.equal(serviceSignal.aborted, true);
+});
+
+test('all completion paths abort the service signal and clear the deadline', async () => {
+  const cases = [
+    [() => html(), 200],
+    [() => html(' '.repeat(512 * 1024 + 1)), 200],
+    [() => new Response(new ReadableStream({ cancel() { return new Promise(() => {}); } })), 200],
+    [() => new Response(null, { status: 302, headers: { location: 'https://169.254.169.254' } }), 502],
+    [() => new Response('quota', { status: 429 }), 429],
+    [() => { throw new Error('service failure'); }, 502],
+  ];
+  for (const [respond, status] of cases) {
+    const caller = new AbortController();
+    let serviceSignal;
+    let aborts = 0;
+    let cleared = 0;
+    const response = await handler(async (_url, options) => {
+      serviceSignal = options.signal;
+      serviceSignal.addEventListener('abort', () => aborts++);
+      return respond();
+    }, {
+      clearTimeout(id) { cleared++; clearTimeout(id); },
+    })('https://example.com', caller.signal);
+    assert.equal(response.status, status);
+    assert.equal(serviceSignal.aborted, true);
+    assert.equal(aborts, 1);
+    assert.equal(cleared, 1);
+    // A late caller abort must not reject an otherwise unused deadline promise.
+    caller.abort();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(aborts, 1);
+  }
 });

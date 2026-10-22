@@ -223,6 +223,8 @@ function getResponseHeaders(response: Response): Record<string, string> {
 }
 
 export const onRequestGet = async (context: PagesContext): Promise<Response> => {
+  const cancelledResponse = () => jsonResponse({ success: false, error: 'The inspection request was cancelled.' }, 499);
+  if (context.request.signal.aborted) return cancelledResponse();
   const requestUrl = new URL(context.request.url);
   const rawTarget = requestUrl.searchParams.get('url');
   if (!rawTarget) return jsonResponse({ success: false, error: 'Missing target url parameter.' }, 400);
@@ -254,9 +256,19 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
   activeRequests += 1;
   const controller = new AbortController();
   let expire!: () => void;
+  let cancel!: () => void;
+  let interruption: 'cancelled' | 'timeout' | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
-    expire = () => { controller.abort(); reject(new Error('Deadline exceeded')); };
+    const stop = (reason: 'cancelled' | 'timeout') => {
+      if (interruption) return;
+      interruption = reason;
+      reject(new Error(reason));
+      controller.abort();
+    };
+    expire = () => stop('timeout');
+    cancel = () => stop('cancelled');
   });
+  context.request.signal.addEventListener('abort', cancel, { once: true });
   const timeoutId = setTimeout(expire, FETCH_TIMEOUT_MS);
   const withinDeadline = <T>(work: Promise<T>): Promise<T> => Promise.race([work, deadline]);
   let upstreamResponse: Response | null = null;
@@ -341,12 +353,16 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       userAgent,
     });
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (interruption === 'cancelled') return cancelledResponse();
+    if (interruption === 'timeout') {
       return jsonResponse({ success: false, error: 'The target website took too long to respond.' }, 504);
     }
     return jsonResponse({ success: false, error: 'Could not fetch the target website. It may be unavailable or block automated requests.' }, 502);
   } finally {
     clearTimeout(timeoutId);
+    context.request.signal.removeEventListener('abort', cancel);
+    // End service work on success and early returns too, including stalled body cancellation.
+    controller.abort();
     activeRequests -= 1;
     if (upstreamResponse?.body && !upstreamResponse.bodyUsed) {
       cancelBody(upstreamResponse);
