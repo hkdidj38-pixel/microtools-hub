@@ -340,3 +340,97 @@ test('all completion paths abort the service signal and clear the deadline', asy
     assert.equal(aborts, 1);
   }
 });
+
+for (const interruption of ['caller abort', 'timeout']) {
+  for (const [kind, status, headers] of [
+    ['redirect', 302, { location: '/next' }],
+    ['non-HTML', 200, { 'Content-Type': 'image/png' }],
+    ['HTML', 200, { 'Content-Type': 'text/html' }],
+    ['quota refusal', 429, {}],
+    ['unavailable service', 503, {}],
+  ]) {
+    test(`${interruption} after ${kind} headers settle stops processing and releases capacity`, { timeout: 2000 }, async () => {
+      const caller = new AbortController();
+      let resolveHeaders;
+      let expire;
+      let serviceSignal;
+      let calls = 0;
+      let cancelled = 0;
+      let cleared = 0;
+      const run = handler((_url, options) => {
+        calls++;
+        serviceSignal = options.signal;
+        return calls === 1 ? new Promise(resolve => { resolveHeaders = resolve; }) : Promise.resolve(html());
+      }, {
+        setTimeout(callback) { expire = callback; return 1; },
+        clearTimeout() { cleared++; },
+      });
+      const pending = run('https://example.com', caller.signal);
+      resolveHeaders(new Response(new ReadableStream({
+        cancel() { cancelled++; return new Promise(() => {}); },
+      }), { status, headers }));
+      // Let the fetch race settle, then interrupt before the handler resumes.
+      queueMicrotask(() => queueMicrotask(() => {
+        if (interruption === 'caller abort') caller.abort();
+        else expire();
+      }));
+
+      assert.equal((await pending).status, interruption === 'caller abort' ? 499 : 504);
+      assert.equal(calls, 1, 'No redirect hop may start after interruption');
+      assert.equal(cancelled, 1, 'The just-delivered body must be cancelled without waiting');
+      assert.equal(serviceSignal.aborted, true);
+      assert.equal(cleared, 1);
+      // Four concurrent admissions would expose a leaked isolate slot.
+      const next = await Promise.all(Array.from({ length: 4 }, () => run('https://example.com')));
+      assert.deepEqual(next.map(response => response.status), [200, 200, 200, 200]);
+      assert.equal(calls, 5);
+      caller.abort();
+      await new Promise(resolve => setImmediate(resolve));
+    });
+  }
+}
+
+test('caller abort during redirect body cancellation prevents the next egress hop', async () => {
+  const caller = new AbortController();
+  let calls = 0;
+  const response = await handler(async () => {
+    calls++;
+    return new Response(new ReadableStream({
+      cancel() { caller.abort(); },
+    }), { status: 302, headers: { location: '/next' } });
+  })('https://example.com', caller.signal);
+  assert.equal(response.status, 499);
+  assert.equal(calls, 1);
+});
+
+test('caller abort during non-HTML body cancellation prevents success', async () => {
+  const caller = new AbortController();
+  const response = await handler(async () => new Response(new ReadableStream({
+    cancel() { caller.abort(); },
+  }), { headers: { 'Content-Type': 'image/png' } }))('https://example.com', caller.signal);
+  assert.equal(response.status, 499);
+});
+
+test('caller abort while cancelling a truncated HTML body prevents success', async () => {
+  const caller = new AbortController();
+  const response = await handler(async () => new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new Uint8Array(512 * 1024)); },
+    cancel() { caller.abort(); },
+  }), { headers: { 'Content-Type': 'text/html' } }))('https://example.com', caller.signal);
+  assert.equal(response.status, 499);
+});
+
+for (const first of ['caller abort', 'timeout']) {
+  test(`${first} keeps its response status when both interruption sources fire`, async () => {
+    const caller = new AbortController();
+    let expire;
+    const response = await handler(async () => {
+      if (first === 'caller abort') { caller.abort(); expire(); }
+      else { expire(); caller.abort(); }
+      return html();
+    }, {
+      setTimeout(callback) { expire = callback; return 1; }, clearTimeout() {},
+    })('https://example.com', caller.signal);
+    assert.equal(response.status, first === 'caller abort' ? 499 : 504);
+  });
+}
