@@ -40,3 +40,9 @@
 - **Decision:** Do not enable or deploy the URL inspector until a distinct independent security review and external egress-service evidence are available.
 - **Reason:** The repository has only the Function contract; actual service implementation, connection-time destination enforcement, shared quotas, and deployed bindings are unverified.
 - **Consequence:** This is a release/operations decision, not proof that the live production binding is absent or disabled.
+
+## D-008 — Publish memory docs without merging the PR
+
+- **Date:** 2026-10-22
+- **Decision:** Open PR #24 for the eight `.agent/` memory files; leave it open for checks/review. Do not merge without a separate explicit request.
+- **Reason:** The owner requested a PR for changes on this branch. The PR is documentation-only; security and production gates remain unresolved.

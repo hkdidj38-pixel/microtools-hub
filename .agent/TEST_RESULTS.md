@@ -1,10 +1,10 @@
 # Test and verification results
 
-**Current checked SHA:** `19df1b74dc25ecc10051c1d21b051ec73e34f847`
+**Code/test baseline SHA:** `19df1b74dc25ecc10051c1d21b051ec73e34f847`
 **Branch:** `arena/e630afaf-microtools-hub`
-**Date:** 2026-10-22. No application code was authored locally; the code arrived through the approved fast-forward to current main.
+**Date:** 2026-10-22. PR #24 contains documentation-only changes on top of this tested source baseline; no application code was changed locally.
 
-## Current-checkout results
+## Code baseline results
 
 | Command/check | Result | Evidence and limits |
 |---|---|---|
@@ -16,9 +16,15 @@
 | `npm audit --json` | FINDINGS, exit 1 | 5 high, 0 moderate, 0 critical, all in development/build tree. Packages: braces, chokidar, fast-glob, micromatch, tailwindcss. No fix applied. |
 | `npm audit --omit=dev --json` | PASS, exit 0 | 0 production-tree advisories reported. |
 | `git diff --check a78…HEAD` | PASS | No whitespace errors in the 16 upstream paths integrated. |
-| Current-main GitHub check runs | PASS metadata only | Dependabot, Cloudflare Pages, CodeQL Actions, CodeQL JavaScript/TypeScript report success. These do not establish the egress service’s live guarantees or replace local tests. |
+| Current-main GitHub check runs | PASS metadata only | Dependabot, Cloudflare Pages, CodeQL Actions, CodeQL JavaScript/TypeScript reported success at code baseline. They do not establish live egress guarantees. |
 
-Environment: Node `v22.22.3`, npm `10.9.8`. `node_modules/` and `dist/` are ignored outputs from the approved install/build. `git status` shows only untracked `.agent/` documentation.
+## PR #24
+
+- Documentation-only PR; initial commit was `6a6a189aad1fb6502a9ccf9a3959196c6732e503`.
+- Checks at the initial PR head were Greptile Review/Cloudflare Pages in progress and CodeQL checks queued. Query GitHub for current PR head/check state before acting; documentation follow-up may retrigger checks.
+- Tests were not rerun after the documentation-only changes.
+
+Environment: Node `v22.22.3`, npm `10.9.8`. `node_modules/` and `dist/` are ignored outputs from the approved install/build.
 
 ## Security assurance still blocked
 
@@ -28,4 +34,4 @@ Environment: Node `v22.22.3`, npm `10.9.8`. `node_modules/` and `dist/` are igno
 
 ## Earlier discovery results
 
-Before fast-forward, remote-main tests/audit were run from temporary copies: text converter 5/5; full audit 5 high dev advisories; production-only 0. Those results agree with the current local run but the current-checkout commands above are authoritative for SHA `19df1b7…`.
+Before fast-forward, remote-main tests/audit were run from temporary copies: text converter 5/5; full audit 5 high dev advisories; production-only 0. The local current-code results above are authoritative for source SHA `19df1b7…`.

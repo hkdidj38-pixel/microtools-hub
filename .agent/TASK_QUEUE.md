@@ -1,20 +1,28 @@
 # Task queue
 
-**Updated:** 2026-10-22. Active branch is `arena/e630afaf-microtools-hub` at `19df1b74dc25ecc10051c1d21b051ec73e34f847`. Production remains unauthorized.
+**Updated:** 2026-10-22. Active branch is `arena/e630afaf-microtools-hub`; last verified code baseline is `19df1b74dc25ecc10051c1d21b051ec73e34f847`. PR #24 is open against `main`. Production remains unauthorized.
 
 ## Completed
 
 ### MH-DISC-000 — Milestone 0 discovery and memory
 
-- **Status:** complete; documentation created under `.agent/`.
-- **Evidence:** current branch/worktree, repository docs/config, remote-main compare, PR #22 source/tests/security contract, deployment metadata limitations.
+- **Status:** complete; project memory created under `.agent/`.
+- **Evidence:** branch/worktree and repository docs/config inspected; remote main compared; PR #22 source/tests/security contract reviewed; deployment limitations recorded.
 
 ### MH-INT-001 — Reconcile branch and run local checks
 
 - **Status:** complete for integration and local verification.
-- **Integration:** approved fast-forward from `a78ca5c9…` to current main `19df1b74…`; branch remains `arena/e630afaf-microtools-hub`. Shallow history required a bounded deepen before ancestry was confirmed. No force, reset, unrelated-history merge, or branch switch.
-- **Checks:** `npm ci` passed; `npm test` 25/25 passed; `npm run build` passed; generated sitemap/robots verified; full audit 5 high dev/build advisories, production-only audit 0; `git diff --check` clean.
-- **No code authored here:** source changes came from the already-merged PR #22 fast-forward. No deployment or egress configuration.
+- **Integration:** approved fast-forward from `a78ca5c9…` to current main `19df1b74…`; branch remains `arena/e630afaf-microtools-hub`. Shallow history required bounded deepen before ancestry was confirmed. No force, reset, unrelated-history merge, or branch switch.
+- **Checks:** `npm ci` passed; `npm test` 25/25 passed; `npm run build` passed; sitemap/robots verified; full audit 5 high dev/build advisories, production-only audit 0; `git diff --check` clean.
+- **Scope:** no application code authored locally. No deployment or egress configuration.
+
+### MH-DOC-001 — Publish project-memory handoff
+
+- **Status:** `PR_OPEN`.
+- **Initial commit:** `6a6a189aad1fb6502a9ccf9a3959196c6732e503`; documentation-only follow-up commits may update the handoff.
+- **PR:** [#24](https://github.com/hkdidj38-pixel/microtools-hub/pull/24), base `main`, head `arena/e630afaf-microtools-hub`.
+- **Scope:** eight `.agent/` markdown files only. Initial head checks were queued/in progress; refresh current status.
+- **Next:** review checks and feedback. Do not merge unless explicitly requested.
 
 ## Open — security gate
 
@@ -28,7 +36,7 @@ task:
   owner: orchestrator/implementation (serial; no sub-agent tool available)
   branch: arena/e630afaf-microtools-hub
   worktree: /home/user/microtools-hub
-  commit_sha: 19df1b74dc25ecc10051c1d21b051ec73e34f847
+  last_verified_code_sha: 19df1b74dc25ecc10051c1d21b051ec73e34f847
   approvals:
     plan: approved
     independent_security_review: pending
