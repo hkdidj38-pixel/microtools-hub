@@ -434,3 +434,49 @@ for (const first of ['caller abort', 'timeout']) {
     assert.equal(response.status, first === 'caller abort' ? 499 : 504);
   });
 }
+
+for (const interruption of ['caller abort', 'timeout']) {
+  for (const [kind, status, location, hops] of [
+    ['quota refusal', 429, undefined, 1],
+    ['unavailable service', 503, undefined, 1],
+    ['blocked redirect', 302, 'https://169.254.169.254', 1],
+    ['redirect limit', 302, '/next', 4],
+  ]) {
+    test(`${interruption} during ${kind} body cancellation overrides the early return`, { timeout: 2000 }, async () => {
+      const caller = new AbortController();
+      let expire;
+      let calls = 0;
+      let cancelled = 0;
+      let cleared = 0;
+      let serviceSignal;
+      const run = handler(async (_url, options) => {
+        calls++;
+        serviceSignal = options.signal;
+        if (calls > hops) return html();
+        if (calls < hops) return new Response(null, { status: 302, headers: { location: `/hop-${calls}` } });
+        return new Response(new ReadableStream({
+          cancel() {
+            cancelled++;
+            if (interruption === 'caller abort') caller.abort();
+            else expire();
+            return new Promise(() => {});
+          },
+        }), { status, headers: location ? { location } : {} });
+      }, {
+        setTimeout(callback) { expire = callback; return 1; },
+        clearTimeout() { cleared++; },
+      });
+      const response = await run('https://example.com', caller.signal);
+      assert.equal(response.status, interruption === 'caller abort' ? 499 : 504);
+      assert.equal(calls, hops);
+      assert.equal(cancelled, 1);
+      assert.equal(serviceSignal.aborted, true);
+      assert.equal(cleared, 1);
+      const next = await Promise.all(Array.from({ length: 4 }, () => run('https://example.com')));
+      assert.deepEqual(next.map(result => result.status), [200, 200, 200, 200]);
+      assert.equal(calls, hops + 4);
+      caller.abort();
+      await new Promise(resolve => setImmediate(resolve));
+    });
+  }
+}

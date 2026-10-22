@@ -302,6 +302,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       throwIfInterrupted(response);
       if (response.status === 429 || response.status === 503) {
         cancelBody(response);
+        throwIfInterrupted();
         return jsonResponse({ success: false, error: 'Inspection is temporarily unavailable or rate limited.' }, response.status);
       }
 
@@ -309,6 +310,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       if (REDIRECT_STATUSES.has(response.status) && location) {
         if (redirectCount === MAX_REDIRECTS) {
           cancelBody(response);
+          throwIfInterrupted();
           return jsonResponse({ success: false, error: 'The target redirected too many times.' }, 502);
         }
         try {
@@ -316,6 +318,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
           if (!hosts.has(finalTarget.hostname)) throw new InvalidTargetError('Unapproved redirect');
         } catch {
           cancelBody(response);
+          throwIfInterrupted();
           return jsonResponse({ success: false, error: 'The target redirected to a blocked URL.' }, 502);
         }
         cancelBody(response);
