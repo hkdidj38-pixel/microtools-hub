@@ -5,6 +5,7 @@ import {
   Braces,
   FileImage,
   FileStack,
+  Film,
   Globe2,
   Hash,
   Search,
@@ -30,6 +31,7 @@ const toolIcons: Record<string, LucideIcon> = {
   'image-compressor': FileImage,
   'pdf-merger': FileStack,
   'url-screenshot': Globe2,
+  'media-converter': Film,
 };
 
 function HomePage() {

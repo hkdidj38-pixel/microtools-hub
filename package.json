@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "test": "node --test",
-    "build": "tsc && vite build && node scripts/prerender.mjs",
+    "build": "tsc && vite build && node scripts/prerender.mjs && node scripts/verify-media-assets.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15",
     "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
     "jszip": "^3.10.1",
