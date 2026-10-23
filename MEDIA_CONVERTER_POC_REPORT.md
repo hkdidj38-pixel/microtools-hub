@@ -1,74 +1,69 @@
-# Media Converter POC — evidence-based release-gate audit
+# Media Converter — deployability and browser-verification report
 
-**Recommendation: NOT READY**
+**Recommendation: NOT READY for release.** The requested local build-artifact and Chromium checks now pass, but no Cloudflare Pages deployment was made, physical phones were not tested, FFmpeg CVEs have not been fully triaged, and license/source correspondence remains unresolved pending qualified counsel.
 
-This recommendation is based on the eight gates below. G1 passes, G4 and G8 fail, and G2, G3, G5, G6, and G7 remain blocked or unverified. This is not production approval, legal advice, browser certification, or a Cloudflare Pages deployment result.
+## Scope and implementation
 
-## Scope and implementation reviewed
+- Working tree: `/home/user/microtools-hub`, on the Arena-fixed branch `arena/b542d97d-microtools-hub`, based on `cdd2ef1396d0ead0e71f399ab441f01f4d1fd33f`. No branch switch or Cloudflare account/settings change was made.
+- The Media Converter remains static and local-first: input media is processed by FFmpeg in the browser/worker. No analytics, media upload, server-side media processing, remote runtime scripts, or remote WASM were added.
+- Supported inputs are MP4, WebM, MP3, WAV, and OGG. The app limits each input to 20 MiB and 10 minutes, limits video streams to 1920 × 1080, allows one active job, and has a five-minute processing timeout. It warns when `navigator.deviceMemory` indicates a low-memory device. Outputs at or above 20 MiB are discarded. These limits do not prove a hard bound on decoder/intermediate memory or protect against every malformed-media attack.
+- The ~32 MB pinned WASM is fetched only when conversion starts. The loader fetches the same-origin build-generated manifest and hashed parts, checks each part and full-source SHA-256, assembles the verified bytes into an `application/wasm` Blob URL, and supplies that URL plus same-origin core JavaScript. Integrity errors fail closed. Loading progress and a one-time-per-browser-cache size notice are shown.
+- A build step splits the source into chunks smaller than 20 MiB. A separate production gate fails if any file in `dist/` exceeds 24 MiB. Cloudflare's official Pages limits page states a 25 MiB per-asset limit ([official documentation](https://github.com/cloudflare/cloudflare-docs/blob/production/src/content/docs/pages/platform/limits.mdx), checked 2026-10-23). Passing local artifact checks is **not** evidence of a successful Pages deployment.
+- `public/_headers` detaches the inherited CSP only on `/tools/media-converter` and its descendants, then adds the narrowly scoped WASM requirement `'wasm-unsafe-eval'`. General `'unsafe-eval'` and external script/network origins are not allowed; other tools retain their strict policy. The local browser harness models matching/overlap/detachment rules in a proxy. Cloudflare documents that matching rules inherit, duplicate header values are joined, and `! Header-Name` detaches a header ([official headers documentation](https://github.com/cloudflare/cloudflare-docs/blob/production/src/content/docs/pages/configuration/headers.mdx), checked 2026-10-23). This proxy does not replace testing an actual Pages response.
+- Added a public FFmpeg notices/licenses page and GPL-2.0 text with upstream/package references and an explicit counsel-review caveat. These notices do not establish that the binary exactly corresponds to the referenced source or provide legal clearance.
 
-- Target: `/tools/media-converter` (also prerendered at `/tools/media-converter/`). The feature is registered through the existing tool-discovery path.
-- FFmpeg is pinned to `@ffmpeg/ffmpeg@0.12.15` and `@ffmpeg/core@0.12.10`. Vite emits same-origin worker, core JavaScript, and WASM assets; application code passes explicit local core/WASM URLs rather than the wrapper's default unpkg URL.
-- Accepted filename containers: MP4, WebM, MP3, WAV, and OGG. The FFmpeg input is forced to the selected demuxer, limited to the `file` protocol, and restricted to decoders `h264,aac,vp8,opus,mp3,mp3float,vorbis,pcm_s16le`. Offered video encoders are H.264/AAC and VP8/Opus; audio outputs are MP3, 16-bit PCM WAV, and Vorbis OGG. VP9 is not offered.
-- Processing is in the browser/worker; this feature adds no server-side media processing or upload endpoint. No user media or repository test media was uploaded. Synthetic test media remained local and below 1 MiB.
-- Current limits: 20 MiB input, one active job, a five-minute processing timeout, FFmpeg `-fs 20971520`, and a JavaScript rejection of outputs at or above 20 MiB after transfer. These constrain some resource use but do **not** bound decoded dimensions, duration, decoder memory, or every temporary allocation. FFmpeg can overshoot its target by a write chunk: the real-core 1 KiB limit test produced 2,476 bytes.
-- Safe scoped fixes retained in this POC: cancellation during asynchronous cleanup cannot return a completed result after cancellation; protocol/demuxer/decoder restrictions are regression-tested; output-write and post-transfer limits are regression-tested. No production configuration or security policy was changed.
+## Asset manifest summary
 
-## Phase 0 — repository baseline and preservation
+Pinned source WASM: **32,232,419 bytes**, SHA-256 `9f57947a5bd530d8f00c5b3f2cb2a3492faa7e5d823315342d6a8656d0a6b7b7`.
 
-- Repository: `/home/user/microtools-hub`; branch `arena/118173ec-microtools-hub`; initial `HEAD` and base: `e0996312840250d256d8fff1adeba69729654190`.
-- The Phase 0 `git status --short` was recorded before edits. It was already dirty: tracked changes included `README.md`, `package.json`, `package-lock.json`, `scripts/prerender.mjs`, and `src/App.tsx`; untracked audit/feature work included `MEDIA_CONVERTER_ASSETS.md`, `MEDIA_CONVERTER_POC_REPORT.md`, `scripts/verify-media-assets.mjs`, `src/tools/media-converter/`, `tests/media-converter.test.mjs`, and `tests/media-core-smoke.test.mjs`. These pre-existing changes were preserved; do not interpret the full diff from `HEAD` as a clean-slate patch.
-- Final status has the same tracked/untracked path set as Phase 0; no paths were added, removed, renamed, or switched. The audit edits are limited to existing README/report/manifest/feature/test files. No destructive Git operation, commit, push, merge, PR, branch switch, deployment, or production configuration change was made.
-- `public/_headers` was inspected and left unchanged. No `wrangler.toml` or `_routes.json` was present in the project root. No environment or secret values are recorded here.
+| Build-generated part | Bytes | SHA-256 |
+|---|---:|---|
+| `part-01-4ccba0c9cc7f019751a958ead3918cf51c9563ff2f8a76fb1f72ae492f66693b.bin` | 16,777,216 | `4ccba0c9cc7f019751a958ead3918cf51c9563ff2f8a76fb1f72ae492f66693b` |
+| `part-02-80e8b2ae7994e92102e048249ab0a6673480ca626c359b1d321b24f105f02e65.bin` | 15,455,203 | `80e8b2ae7994e92102e048249ab0a6673480ca626c359b1d321b24f105f02e65` |
 
-## Gate results
+The generated manifest records both parts, byte counts, per-part SHA-256 values, and the full source digest. Full installed package paths and source provenance are in [`MEDIA_CONVERTER_ASSETS.md`](./MEDIA_CONVERTER_ASSETS.md).
 
-| Gate | Result | Evidence and unresolved work |
-|---|---|---|
-| **G1 — Repository integrity** | **PASS** | Fixed branch/base and dirty Phase 0 status recorded; pre-existing paths preserved. `npm ci`, full tests, production build, prerender, and the media-asset verifier completed successfully after the audit edits. Final path set matches baseline. This is a local check, not a clean worktree or independent review. |
-| **G2 — Browser functionality** | **BLOCKED** | No Chromium, Chrome, Firefox, Playwright, or Puppeteer is installed. Node unit tests, Node-hosted FFmpeg-core tests, and a local HTTP preview are not browser tests. Static CSP concern: the configured policy uses `script-src 'self'` without `'wasm-unsafe-eval'`; the pinned Emscripten core calls `WebAssembly.instantiateStreaming` and `WebAssembly.instantiate`. CSP Level 3 lists these WebAssembly sinks as gated by `'wasm-unsafe-eval'` or `'unsafe-eval'` ([spec](https://github.com/w3c/webappsec-csp/blob/main/index.bs#L2923-L2935)). This is a browser compatibility red flag, not a claimed browser-observed error. CSP, worker loading, UI conversion, cancellation, downloads, and supported-browser/device behavior remain unverified. The prohibited `_headers`/production-policy edits were not made. |
-| **G3 — Security isolation** | **BLOCKED** | Static source and real-core tests verify `-protocol_whitelist file`, forced supported demuxers, decoder allowlist, and same-origin core/WASM URLs; the real core rejects an HTTP input and rejects WebM bytes forced through the MP4 demuxer. No browser network capture or deployed response-header observation was possible, so end-to-end no-egress/CSP isolation is not claimed. The wrapper package contains a default unpkg URL, but the application explicitly passes local URLs; no remote fallback was observed in a browser. |
-| **G4 — Robustness and resource bounds** | **FAIL** | The input, processing-time, and output-write controls are real and tested. However, there is no explicit media-duration, resolution, or dimension cap. A small compressed file can still cause large decoder allocations or peak memory use; the five-minute wall timeout does not cap memory. The output ceiling may overshoot by an FFmpeg write chunk and the post-transfer check occurs after that data has been read/transferred. No adversarial media corpus, fuzzing, or browser-memory stress run was performed. |
-| **G5 — FFmpeg vulnerability assessment** | **BLOCKED** | The installed core identifies as FFmpeg 5.1.4 / libavcodec 59.37.100. Upstream tag/changelog comparison shows later fixes in FFmpeg 5.1.10 and a newer observed 9.0.2 tag; this establishes version-risk evidence, not CVE applicability. No complete CVE inventory, exact-binary vulnerability assessment, C/C++ scan, or qualified security review was completed. NVD was not independently accessed. No vulnerability-free claim is made. |
-| **G6 — Licensing and source obligations** | **BLOCKED** | `@ffmpeg/core@0.12.10` declares GPL-2.0-or-later and its configuration enables GPL components, including libx264/libx265. The package dry-run contains only bundled ESM/UMD JS/WASM and `package.json`—no source or license text. The public `ffmpeg.wasm` `v0.12.10` tag's `packages/core/package.json` says version `0.12.6` and MIT, so that tag does not establish the exact published core artifact's source/license chain. Corresponding-source, notices, GPL obligations, enabled-library terms, and codec patent questions remain for qualified counsel; no legal determination is claimed. |
-| **G7 — Supply chain** | **BLOCKED** | Versions, lockfile integrity values, installed source hashes, and emitted-asset hashes are pinned/checked; `npm ci` and the build verifier passed. Registry metadata includes signatures, but `npm audit signatures` failed with `ECONNRESET` fetching Sigstore TUF root data, so signatures were not locally verified. Full `npm audit` reports five high-severity package findings, all in the development Tailwind tree; the distinct advisory is GHSA-vfj7-8cjw-p6xm / CVE-2026-93687 affecting `braces@3.0.3` (no first-patched version listed). `npm audit --omit=dev` reports zero production findings. No runtime browser network observation or independent provenance attestation was completed. |
-| **G8 — Cloudflare Pages** | **FAIL** | Built WASM is **32,232,419 bytes**. Cloudflare Pages documents a **25 MiB / 26,214,400-byte** maximum per asset ([official limits source](https://github.com/cloudflare/cloudflare-docs/blob/production/src/content/docs/pages/platform/limits.mdx#L44-L50); observed source commit `198c7b5193ad52b882562f593a27bd985eba4a46`, 2026-09-05). The asset exceeds the limit by **6,018,019 bytes**. Local gzip size is not a waiver of the per-file limit. Local Vite preview is not a Pages deployment; deployment, deployed MIME, routing, and Pages behavior were not tested. No hosting configuration was changed. |
+## Verification results
 
-## Checks and observed results
-
-| Command/check | Result |
+| Command | Result |
 |---|---|
-| Baseline `npm ci`, `npm test`, `npm run build` at `e0996312840250d256d8fff1adeba69729654190` | Previously recorded: baseline install completed; 29 tests passed; TypeScript/build/prerender passed. The original baseline already reported five high findings in the development Tailwind dependency tree. |
-| Final `npm ci` | Exit 0; added 168 packages and audited 169. npm reported five high findings. Full output: `/tmp/media-converter-npm-ci.log` (sandbox temporary log). |
-| Final `npm test` | Exit 0; **41 passed, 0 failed, 0 skipped**. Includes converter validation/lifecycle tests, cancellation-cleanup regression, protocol and spoofed-container rejection, and Node-hosted pinned-core conversions. Full output: `/tmp/media-converter-npm-test.log`. |
-| Final `npm run build` | Exit 0; TypeScript, Vite, prerender, and `scripts/verify-media-assets.mjs` all passed. The verifier found the prerendered route/sitemap and same-origin core references, checked pinned source/emitted hashes, and found the worker. Full output: `/tmp/media-converter-build.log`. |
-| Local Vite preview | `GET /tools/media-converter` and `/tools/media-converter/` both returned 200; HEAD for core JS, WASM, and worker returned 200. WASM response was `application/wasm`, `Content-Length: 32232419`. This verifies local static serving only, not browser execution or Cloudflare. Full output: `/tmp/media-converter-preview-check.log`. |
-| `npm audit --json` | Exit 1; 5 high findings (one distinct GHSA propagated through Tailwind dependencies). Full JSON: `/tmp/media-converter-audit-full.json`. |
-| `npm audit --omit=dev --json` | Exit 0; 0 production findings. Full JSON: `/tmp/media-converter-audit-prod.json`. |
-| `npm audit signatures` | Exit 1; `ECONNRESET` for `https://tuf-repo-cdn.sigstore.dev/13.root.json`. Output: `/tmp/media-converter-audit-signatures.log`. |
-| `npm pack --dry-run --json --pack-destination /tmp @ffmpeg/core@0.12.10` | Exit 0; 5 files, 20,634,719-byte package / 64,689,644-byte unpacked. No source or license file. Full JSON: `/tmp/media-converter-core-pack.json`. No package was published or uploaded. |
-| Browser discovery | No `chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`, or `firefox`; no top-level Playwright/Puppeteer packages. |
+| `npm ci` | **PASS**, exit 0; 191 packages added, 192 audited. npm reported 5 high-severity development dependency findings (see below). |
+| `npm test` | **PASS**, exit 0; 45 passed, 0 failed, 0 skipped. Includes loader integrity/cross-origin tests, size-gate boundary test, media limits/format tests, engine cancellation/progress tests, and pinned-core checks. |
+| `npm run build` | **PASS**, exit 0; TypeScript, Vite, prerender, asset/provenance verification, and 24 MiB `dist/` size gate all passed. Two same-origin WASM parts and the generated manifest were verified against the full-source digest. |
+| `npm run test:browser` | **PASS**, exit 0 using Playwright 1.64.1 and packaged headless Chromium 153.0.8010.0 on local Vite preview. The local proxy applied repository `_headers` rules for the test; this is not a Pages deployment. |
+| `npm audit --json` | Exit 1: 5 high-severity affected package nodes in the development Tailwind tree, arising from the `braces` advisory GHSA-vfj7-8cjw-p6xm. npm reports a fix through Tailwind 4.3.3, a major upgrade. |
+| `npm audit --omit=dev --json` | **PASS**, exit 0; 0 production dependency findings in the current npm advisory database. |
 
-Temporary logs are outside the repository and are not deliverables. Re-run the commands above to reproduce them. No lint script or separate typecheck script exists; TypeScript checking is part of `npm run build`. No CI workflow or Pages deployment was executed.
+### Browser assertions actually observed
 
-## Asset integrity and provenance
+- Route returned 200 with the modeled route-scoped CSP; the `/tools/media-converter/licenses.html` page and linked GPL text also returned 200. Chromium reported no CSP console errors or page errors.
+- Low-memory warning was shown after the test set `navigator.deviceMemory` to 2; the ~32 MB core-size notice and loading progress/cancel affordance were present. The browser requested no core assets at page load; after conversion started, it requested the same-origin manifest, both hashed parts, and same-origin core JavaScript, with no standalone `.wasm` URL request.
+- Cancellation aborted a deliberately held local WASM-part request; a second cancellation terminated an active FFmpeg conversion.
+- Synthetic MP4 → WebM download succeeded (**20,776 bytes**); synthetic WAV → MP3 download succeeded (**10,701 bytes**). Fixtures were generated locally and remained below 1 MiB.
+- The **390 × 844** viewport had no horizontal overflow.
+- The browser context observed zero non-same-origin HTTP(S) requests during page load, core loading, cancellation, conversion, and download. This does not prove behavior after deployment or in other browsers.
 
-Exact installed package paths, registry SRI values, SHA-256 hashes, core configuration, and limitations are recorded in [`MEDIA_CONVERTER_ASSETS.md`](./MEDIA_CONVERTER_ASSETS.md). Key emitted values from the final build:
+## Release gates / what is and is not established
 
-- `dist/assets/ffmpeg-core-CgUfceKH.wasm`: 32,232,419 bytes; SHA-256 `9f57947a5bd530d8f00c5b3f2cb2a3492faa7e5d823315342d6a8656d0a6b7b7`.
-- `dist/assets/ffmpeg-core-CI9Irx9p.js`: 111,804 bytes; SHA-256 `67a48f11645f85439f3fde4f2119042c16b374b910206b7a7a24f342e28dcae3`.
-- Vite wrapper worker `dist/assets/worker-BAOIWoxA.js`: 2,526 bytes; SHA-256 `242931933b757920171cbdfd4ad7a082cfaa6537a0110e707d80d1555eaa0890`.
-- `@ffmpeg/core` npm metadata declares GPL-2.0-or-later; the installed build reports FFmpeg 5.1.4 with libavcodec 59.37.100. Enabled codec/library configuration and source-provenance discrepancy are detailed in the asset manifest.
+| Area | Status | Evidence or remaining work |
+|---|---|---|
+| Build-size/deployment artifact | **PASS locally; deployment OPEN** | All `dist/` files pass the 24 MiB gate; each WASM chunk is below 20 MiB. Deploy to Cloudflare Pages and verify actual responses, MIME, cache, routing, and headers before asserting production readiness. No deployment was performed. |
+| Chromium functionality and CSP | **PASS in tested local setup** | Browser tests above include conversions, both cancellation paths, CSP, same-origin requests, and no console/page errors. This is not cross-browser certification. |
+| Physical mobile devices | **NOT VERIFIED** | 390 × 844 is browser viewport emulation only. No real iOS/Android phones or tablets were tested; device-memory behavior and codec support vary. |
+| Resource limits | **PARTIAL** | File size, duration, resolution, job count, timeout, and output ceiling are implemented and unit-tested. No adversarial media corpus, fuzzing, or browser memory-stress assessment; memory is not hard-bounded. |
+| FFmpeg vulnerabilities | **NOT VERIFIED** | No complete CVE applicability inventory or exact-binary security assessment for FFmpeg 5.1.4, and no qualified review. Do not infer vulnerability-free status. |
+| Licensing/source obligations | **NOT VERIFIED; counsel review required** | `@ffmpeg/core@0.12.10` declares GPL-2.0-or-later and enables GPL components. Its npm archive lacks corresponding source/license text; the public `ffmpeg.wasm` `v0.12.10` tag reports a different core version/license. Exact binary/source correspondence, notice/sourcing obligations, and patent issues are unresolved. The notices page is informational, not legal approval. |
+| npm supply chain | **PARTIAL** | Production `npm audit` reports zero findings; dev audit reports 5 high nodes from the Tailwind/braces advisory. `npm audit signatures` was not re-run in this verification; an earlier attempt failed with `ECONNRESET` fetching Sigstore TUF root metadata, so signature verification remains unverified. |
 
-## Evidence references
+## Files changed
 
-- Cloudflare Pages limits: [source file](https://github.com/cloudflare/cloudflare-docs/blob/production/src/content/docs/pages/platform/limits.mdx#L44-L50), observed commit [`198c7b5193ad52b882562f593a27bd985eba4a46`](https://github.com/cloudflare/cloudflare-docs/commit/198c7b5193ad52b882562f593a27bd985eba4a46).
-- FFmpeg upstream: [n5.1.4](https://github.com/FFmpeg/FFmpeg/tree/n5.1.4), [n5.1.10 changelog](https://github.com/FFmpeg/FFmpeg/blob/n5.1.10/Changelog), [tags](https://github.com/FFmpeg/FFmpeg/tags). The cited changelog entries are not a complete CVE assessment.
-- Dependency advisory: [GHSA-vfj7-8cjw-p6xm / CVE-2026-93687](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
-- Core package metadata: [npm `@ffmpeg/core@0.12.10`](https://registry.npmjs.org/@ffmpeg%2fcore/0.12.10); compare [FFmpeg-WASM tag `v0.12.10`](https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v0.12.10) and its [`packages/core/package.json`](https://github.com/ffmpegwasm/ffmpeg.wasm/blob/v0.12.10/packages/core/package.json).
-- WebAssembly CSP behavior: [W3C CSP Level 3](https://github.com/w3c/webappsec-csp/blob/main/index.bs#L2923-L2935). Browser behavior for this app remains untested.
+- Build and package: `package.json`, `package-lock.json`, `.gitignore`.
+- Runtime and route policy: `src/tools/media-converter/wasmLoader.ts`, `ffmpegAssets.ts`, `formats.ts`, `engine.ts`, `index.tsx`, `meta.ts`, `public/_headers`.
+- Build scripts and automated checks: `scripts/split-media-wasm.mjs`, `scripts/check-asset-sizes.mjs`, `scripts/verify-media-assets.mjs`, `scripts/run-media-converter-browser-check.mjs`, `tests/build-asset-sizes.test.mjs`, `tests/media-converter.test.mjs`, `tests/media-core-smoke.test.mjs`.
+- Notices and docs: `NOTICE.md`, `public/tools/media-converter/licenses.html`, `public/tools/media-converter/GPL-2.0.txt`, `README.md`, `MEDIA_CONVERTER_ASSETS.md`, this report.
+
+Generated WASM chunks/manifest and `dist/` outputs are build artifacts, not committed source assets; the prebuild script regenerates and verifies them.
 
 ## Final disposition
 
-G2, G3, G5, G6, and G7 have unavailable or incomplete required evidence; G4 and G8 have confirmed release failures. Do not publish or deploy this POC as a release until the resource-bound design, hosting asset size, browser/CSP behavior, vulnerability review, licensing/source obligations, and supply-chain verification have been resolved and independently reviewed.
-
-**NOT READY**
+The acceptance criteria for a size-bounded build and a locally exercised real-browser converter are met by the commands above. Do not claim Cloudflare deployment, physical-device compatibility, complete FFmpeg CVE clearance, or legal clearance: those remain explicitly open. **NOT READY for release until deployment is verified and the security/licensing reviews are complete.**

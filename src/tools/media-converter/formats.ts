@@ -3,6 +3,10 @@ import type { MediaFormat, MediaKind, MediaOperation } from './types';
 export const MAX_INPUT_BYTES = 20 * 1024 * 1024;
 export const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 export const MAX_PROCESSING_MS = 5 * 60 * 1000;
+export const MAX_PROBE_MS = 15 * 1000;
+export const MAX_MEDIA_DURATION_SECONDS = 10 * 60;
+export const MAX_VIDEO_WIDTH = 1920;
+export const MAX_VIDEO_HEIGHT = 1080;
 export const DEFAULT_VIDEO_QUALITY = 28;
 
 export const FORMAT_INFO: Record<MediaFormat, { kind: MediaKind; mimeType: string; extensions: string[]; mimeTypes: string[] }> = {
@@ -72,6 +76,55 @@ export function getDefaultOutputFormat(input: MediaFormat, operation: MediaOpera
 
 export function getDefaultOperation(format: MediaFormat): MediaOperation {
   return getMediaKind(format) === 'video' ? 'video-convert' : 'audio-convert';
+}
+
+export function buildProbeArgs(options: { inputPath: string; inputFormat: MediaFormat; outputPath: string }): string[] {
+  return [
+    '-v', 'error',
+    '-protocol_whitelist', 'file',
+    '-f', INPUT_DEMUXERS[options.inputFormat],
+    '-codec_whitelist', INPUT_DECODERS,
+    '-probesize', '5000000',
+    '-analyzeduration', '5000000',
+    '-max_alloc', '67108864',
+    '-show_entries', 'format=duration:stream=codec_type,width,height',
+    '-of', 'json', options.inputPath, '-o', options.outputPath,
+  ];
+}
+
+export function validateProbeResult(probeText: string, operation: MediaOperation): string | null {
+  let probe: { format?: { duration?: unknown }; streams?: Array<{ codec_type?: unknown; width?: unknown; height?: unknown }> };
+  try {
+    probe = JSON.parse(probeText) as typeof probe;
+  } catch {
+    return 'FFmpeg could not inspect this file. It may be malformed or use an unsupported codec.';
+  }
+  if (!probe || !Array.isArray(probe.streams) || !probe.format) {
+    return 'FFmpeg could not inspect this file. It may be malformed or use an unsupported codec.';
+  }
+
+  const duration = Number(probe.format.duration);
+  if (!Number.isFinite(duration) || duration <= 0) return 'The media duration could not be verified, so this file was not converted.';
+  if (duration > MAX_MEDIA_DURATION_SECONDS) return 'Choose media that is no longer than 10 minutes.';
+
+  const audioStreams = probe.streams.filter((stream) => stream.codec_type === 'audio');
+  const videoStreams = probe.streams.filter((stream) => stream.codec_type === 'video');
+  const needsAudio = operation === 'audio-convert' || operation === 'video-to-audio';
+  const needsVideo = operation === 'video-convert' || operation === 'video-compress';
+  if (needsAudio && audioStreams.length === 0) return 'No supported audio stream was found in this file.';
+  if (needsVideo && videoStreams.length === 0) return 'No supported video stream was found in this file.';
+
+  for (const stream of videoStreams) {
+    const width = Number(stream.width);
+    const height = Number(stream.height);
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+      return 'The video dimensions could not be verified, so this file was not converted.';
+    }
+    if (width > MAX_VIDEO_WIDTH || height > MAX_VIDEO_HEIGHT) {
+      return 'Choose video no larger than 1920 × 1080 pixels.';
+    }
+  }
+  return null;
 }
 
 export function buildConversionArgs(options: {

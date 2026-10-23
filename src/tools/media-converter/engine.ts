@@ -1,4 +1,6 @@
-import { buildConversionArgs, getFileFormat, getMediaKind, getOutputFormats, makeOutputName, MAX_OUTPUT_BYTES, MAX_PROCESSING_MS, validateMediaFile } from './formats';
+import { buildConversionArgs, buildProbeArgs, getFileFormat, getMediaKind, getOutputFormats, makeOutputName, MAX_OUTPUT_BYTES, MAX_PROCESSING_MS, MAX_PROBE_MS, validateMediaFile, validateProbeResult } from './formats';
+import { loadVerifiedWasm } from './wasmLoader';
+import type { WasmDownloadProgress } from './wasmLoader';
 import type { ConversionProgress, ConversionRequest, ConversionResult, MediaFormat } from './types';
 
 export interface FFmpegClient {
@@ -7,6 +9,7 @@ export interface FFmpegClient {
   on(event: 'progress', callback: (event: { progress: number; time: number }) => void): void;
   off(event: 'progress', callback: (event: { progress: number; time: number }) => void): void;
   writeFile(path: string, data: Uint8Array): Promise<unknown>;
+  ffprobe(args: string[], timeout?: number): Promise<number>;
   exec(args: string[]): Promise<number>;
   readFile(path: string): Promise<Uint8Array | string>;
   deleteFile(path: string): Promise<unknown>;
@@ -21,19 +24,22 @@ export interface ConversionHandle {
 interface ActiveJob {
   id: number;
   cancellation: 'cancelled' | 'timeout' | null;
+  abortController: AbortController;
   timeoutId: ReturnType<typeof setTimeout> | null;
   progressHandler: ((event: { progress: number; time: number }) => void) | null;
 }
 
 export interface MediaConverterEngineOptions {
   coreURL: string;
-  wasmURL: string;
+  wasmManifestURL: string;
   timeoutMs?: number;
+  wasmLoader?: typeof loadVerifiedWasm;
 }
 
 export class MediaConverterEngine {
   private ffmpeg: FFmpegClient | null = null;
   private activeJob: ActiveJob | null = null;
+  private wasmObjectURL: string | null = null;
   private nextJobId = 0;
   private disposed = false;
 
@@ -42,7 +48,11 @@ export class MediaConverterEngine {
     private readonly options: MediaConverterEngineOptions,
   ) {}
 
-  start(request: ConversionRequest, onProgress?: (progress: ConversionProgress) => void): ConversionHandle {
+  start(
+    request: ConversionRequest,
+    onProgress?: (progress: ConversionProgress) => void,
+    onDownloadProgress?: (progress: WasmDownloadProgress) => void,
+  ): ConversionHandle {
     if (this.disposed) throw new Error('The media converter is no longer available. Reopen the tool and try again.');
     if (this.activeJob) throw new Error('A conversion is already in progress.');
 
@@ -61,6 +71,7 @@ export class MediaConverterEngine {
     const job: ActiveJob = {
       id: ++this.nextJobId,
       cancellation: null,
+      abortController: new AbortController(),
       timeoutId: null,
       progressHandler: null,
     };
@@ -70,16 +81,18 @@ export class MediaConverterEngine {
       if (this.activeJob?.id !== job.id || job.cancellation) return;
       job.timeoutId = null;
       job.cancellation = 'timeout';
+      job.abortController.abort();
       this.terminateEngine();
     }, timeoutMs);
 
-    return { jobId: job.id, promise: this.execute(job, request, inputFormat, onProgress) };
+    return { jobId: job.id, promise: this.execute(job, request, inputFormat, onProgress, onDownloadProgress) };
   }
 
   cancel(jobId: number): boolean {
     const job = this.activeJob;
     if (!job || job.id !== jobId) return false;
     job.cancellation = 'cancelled';
+    job.abortController.abort();
     if (job.timeoutId !== null) clearTimeout(job.timeoutId);
     job.timeoutId = null;
     this.terminateEngine();
@@ -97,19 +110,31 @@ export class MediaConverterEngine {
     request: ConversionRequest,
     inputFormat: MediaFormat,
     onProgress?: (progress: ConversionProgress) => void,
+    onDownloadProgress?: (progress: WasmDownloadProgress) => void,
   ): Promise<ConversionResult> {
     let engine: FFmpegClient | null = null;
     const inputPath = `/input-${job.id}.${inputFormat}`;
     const outputPath = `/output-${job.id}.${request.outputFormat}`;
+    const probePath = `/probe-${job.id}.json`;
 
     try {
-      engine = await this.loadEngine(job);
+      engine = await this.loadEngine(job, onDownloadProgress);
       this.assertCurrent(job);
 
       const input = new Uint8Array(await request.file.arrayBuffer());
       this.assertCurrent(job);
       await engine.writeFile(inputPath, input);
       this.assertCurrent(job);
+
+      // ffprobe writes its JSON report into the virtual filesystem. This build returns
+      // a non-zero wrapper status for successful probes, so the validated report is authoritative.
+      await engine.ffprobe(buildProbeArgs({ inputPath, inputFormat, outputPath: probePath }), MAX_PROBE_MS);
+      this.assertCurrent(job);
+      const rawProbe = await engine.readFile(probePath);
+      this.assertCurrent(job);
+      const probeText = typeof rawProbe === 'string' ? rawProbe : new TextDecoder().decode(rawProbe);
+      const probeError = validateProbeResult(probeText, request.operation);
+      if (probeError) throw new Error(probeError);
 
       const progressHandler = (event: { progress: number; time: number }) => {
         if (this.activeJob?.id !== job.id || job.cancellation) return;
@@ -163,7 +188,7 @@ export class MediaConverterEngine {
       if (engine && job.progressHandler) engine.off('progress', job.progressHandler);
       try {
         if (engine && this.ffmpeg === engine && engine.loaded && !job.cancellation) {
-          await this.cleanupFiles(engine, [inputPath, outputPath]);
+          await this.cleanupFiles(engine, [inputPath, outputPath, probePath]);
         }
         this.assertCurrent(job);
       } finally {
@@ -172,12 +197,23 @@ export class MediaConverterEngine {
     }
   }
 
-  private async loadEngine(job: ActiveJob): Promise<FFmpegClient> {
+  private async loadEngine(
+    job: ActiveJob,
+    onDownloadProgress?: (progress: WasmDownloadProgress) => void,
+  ): Promise<FFmpegClient> {
     if (this.ffmpeg?.loaded) return this.ffmpeg;
     if (!this.ffmpeg) this.ffmpeg = this.createFFmpeg();
     const engine = this.ffmpeg;
     try {
-      await engine.load({ coreURL: this.options.coreURL, wasmURL: this.options.wasmURL });
+      if (!this.wasmObjectURL) {
+        this.wasmObjectURL = await (this.options.wasmLoader ?? loadVerifiedWasm)(
+          this.options.wasmManifestURL,
+          job.abortController.signal,
+          onDownloadProgress,
+        );
+      }
+      this.assertCurrent(job);
+      await engine.load({ coreURL: this.options.coreURL, wasmURL: this.wasmObjectURL });
       this.assertCurrent(job);
       return engine;
     } catch (error) {
@@ -220,6 +256,10 @@ export class MediaConverterEngine {
       } catch {
         // Termination is best-effort; dropping the reference prevents reuse.
       }
+    }
+    if (this.wasmObjectURL) {
+      URL.revokeObjectURL(this.wasmObjectURL);
+      this.wasmObjectURL = null;
     }
   }
 
