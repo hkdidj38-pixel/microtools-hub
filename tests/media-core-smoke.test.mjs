@@ -52,6 +52,19 @@ test('pinned FFmpeg core encodes and probes a synthetic video and audio across t
     '-c:a', 'aac', '-b:a', '64k', '/fixture.mp4',
   );
   assert.match(probe('/fixture.mp4'), /codec_name=h264[\s\S]*codec_name=aac/);
+  messages.length = 0;
+  core.ffprobe(
+    '-v', 'error', '-protocol_whitelist', 'file', '-f', 'mp4',
+    '-codec_whitelist', 'h264,aac,vp8,opus,mp3,mp3float,vorbis,pcm_s16le',
+    '-probesize', '5000000', '-analyzeduration', '5000000', '-max_alloc', '67108864',
+    '-show_entries', 'format=duration:stream=codec_type,width,height', '-of', 'json',
+    '/fixture.mp4', '-o', '/probe-video.json',
+  );
+  core.reset();
+  const videoProbe = JSON.parse(new TextDecoder().decode(core.FS.readFile('/probe-video.json')));
+  assert.equal(Number(videoProbe.format.duration), 1);
+  const videoStream = videoProbe.streams.find((stream) => stream.codec_type === 'video');
+  assert.deepEqual([videoStream.width, videoStream.height], [96, 64]);
 
   run(
     '-protocol_whitelist', 'file', '-f', 'mp4', '-codec_whitelist', 'h264,aac,vp8,opus,mp3,mp3float,vorbis,pcm_s16le', '-i', '/fixture.mp4', '-map_metadata', '-1', '-map', '0:v:0', '-map', '0:a:0?',

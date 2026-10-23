@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { AlertCircle, CheckCircle2, Download, FileAudio, FileVideo, LoaderCircle, ShieldCheck, Video, X } from 'lucide-react';
 import { MediaConverterEngine } from './engine';
-import { FFMPEG_CORE_URL, FFMPEG_WASM_URL } from './ffmpegAssets';
+import { FFMPEG_CORE_URL, FFMPEG_WASM_MANIFEST_URL } from './ffmpegAssets';
+import type { WasmDownloadProgress } from './wasmLoader';
 import {
   DEFAULT_VIDEO_QUALITY,
   FORMAT_INFO,
@@ -51,6 +52,7 @@ export default function MediaConverterTool() {
   const [isBusy, setIsBusy] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [progress, setProgress] = useState<ConversionProgress | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<WasmDownloadProgress | null>(null);
   const [status, setStatus] = useState('Choose a supported media file to begin.');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ConversionResult | null>(null);
@@ -59,6 +61,9 @@ export default function MediaConverterTool() {
   const outputURLRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const supportedOutputs = useMemo(() => getOutputFormats(operation), [operation]);
+  const deviceMemoryGiB = typeof navigator !== 'undefined' && 'deviceMemory' in navigator
+    ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory)
+    : null;
   const fileFormat = file ? getFileFormat(file.name) : null;
   const supportedOperations = fileFormat ? getOperations(fileFormat) : [];
 
@@ -122,21 +127,30 @@ export default function MediaConverterTool() {
     setIsCancelling(false);
     setError(null);
     setProgress(null);
+    setDownloadProgress(null);
     clearResult();
-    setStatus('Loading the local conversion engine…');
+    setStatus('Checking media duration and resolution…');
 
     try {
       const engine = engineRef.current ?? new MediaConverterEngine(
         () => new FFmpeg(),
-        { coreURL: FFMPEG_CORE_URL, wasmURL: FFMPEG_WASM_URL },
+        { coreURL: FFMPEG_CORE_URL, wasmManifestURL: FFMPEG_WASM_MANIFEST_URL },
       );
       engineRef.current = engine;
       const handle = engine.start(
         { file, operation, outputFormat, quality },
         (nextProgress) => {
           if (!mountedRef.current || activeJobIdRef.current !== nextProgress.jobId) return;
+          setDownloadProgress(null);
           setProgress(nextProgress);
           setStatus('Converting locally…');
+        },
+        (nextDownloadProgress) => {
+          if (!mountedRef.current || activeJobIdRef.current === null) return;
+          setDownloadProgress(nextDownloadProgress);
+          setStatus(nextDownloadProgress.progress >= 1
+            ? 'Checking media duration and resolution…'
+            : 'Downloading the local FFmpeg core…');
         },
       );
       activeJobIdRef.current = handle.jobId;
@@ -159,6 +173,7 @@ export default function MediaConverterTool() {
         activeJobIdRef.current = null;
         setIsBusy(false);
         setIsCancelling(false);
+        setDownloadProgress(null);
       }
     }
   };
@@ -197,6 +212,13 @@ export default function MediaConverterTool() {
         <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <p>This browser is missing required WebAssembly or Worker support. Try a current desktop browser.</p>
+        </div>
+      )}
+
+      {deviceMemoryGiB !== null && Number.isFinite(deviceMemoryGiB) && deviceMemoryGiB <= 4 && (
+        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <p>This browser reports a low-memory device ({deviceMemoryGiB} GiB or less). Media conversion may fail or make the browser unresponsive; close other tabs and use smaller files if possible.</p>
         </div>
       )}
 
@@ -324,6 +346,21 @@ export default function MediaConverterTool() {
           {result ? <CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden="true" /> : isBusy ? <LoaderCircle className="h-4 w-4 animate-spin text-brand" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />}
           <span>{status}</span>
         </p>
+        {downloadProgress && isBusy && (
+          <div className="mt-3 rounded-xl border border-line bg-white p-3">
+            <div className="mb-1 flex justify-between gap-3 text-xs text-muted">
+              <span>Downloading FFmpeg core (~32 MB, one-time per browser cache)</span>
+              <span>{Math.round(downloadProgress.progress * 100)}%</span>
+            </div>
+            <progress
+              className="h-2 w-full accent-brand"
+              max="1"
+              value={downloadProgress.progress}
+              aria-label="Downloading FFmpeg core"
+            />
+            <p className="mt-1 text-[11px] text-muted">{formatBytes(downloadProgress.bytesReceived)} of {formatBytes(downloadProgress.totalBytes)} downloaded. The browser may download it again if its cache is cleared or evicted.</p>
+          </div>
+        )}
         {progress && isBusy && (
           <div className="mt-3">
             <div className="mb-1 flex justify-between text-xs text-muted"><span>Approximate FFmpeg progress</span><span>{Math.round(progress.progress * 100)}%</span></div>
@@ -350,8 +387,8 @@ export default function MediaConverterTool() {
 
       <aside className="rounded-2xl border border-brand/15 bg-brand-soft/55 p-4 text-xs leading-5 text-muted" aria-label="Privacy and resource information">
         <p className="flex items-start gap-2 font-semibold text-ink"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />Your media is processed locally in this browser and is not uploaded.</p>
-        <p className="mt-2">FFmpeg input access is restricted to local files. The worker and core use same-origin assets; the large core JavaScript and WebAssembly files load when you start. The current proof of concept accepts one input up to {formatBytesForUI()}, stops FFmpeg output writes at {formatBytes(MAX_OUTPUT_BYTES)}, discards results that reach that limit, and runs one job at a time. FFmpeg can overshoot its file-size target by a packet or muxer chunk before the post-read rejection; this does not bound decoder memory or every temporary allocation. Media files can use much more memory after decoding; even a file within these limits can exceed available browser memory. Large files and mobile devices are not yet validated.</p>
-        <p className="mt-2">Only MP4, WebM, MP3, WAV, and OGG containers are offered. Codec support varies; files with unsupported or malformed codecs will fail. Video quality controls are encoder-specific and do not guarantee a smaller file.</p>
+        <p className="mt-2">FFmpeg input access is restricted to local files. The worker, core JavaScript, and verified WebAssembly parts load from this site only when you start a conversion. The core is about 32 MB and is cached by your browser after the first download; the browser may fetch it again if that cache is cleared or evicted. Inputs are limited to {formatBytesForUI()} and 10 minutes; video is limited to 1920 × 1080; one job runs at a time with a 5-minute processing timeout. FFmpeg stops output writes at {formatBytes(MAX_OUTPUT_BYTES)}, and outputs at or above that size are discarded. Decoder and temporary memory use can still exceed available device memory.</p>
+        <p className="mt-2">Only MP4, WebM, MP3, WAV, and OGG containers are offered. Codec support varies; files with unsupported or malformed codecs will fail. Video quality controls are encoder-specific and do not guarantee a smaller file. <a className="font-semibold text-brand underline" href="/tools/media-converter/licenses.html">FFmpeg licenses, notices, and source references</a>.</p>
       </aside>
     </div>
   );

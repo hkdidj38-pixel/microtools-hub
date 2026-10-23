@@ -1,7 +1,6 @@
 import coreURL from '@ffmpeg/core?url';
-import wasmURL from '@ffmpeg/core/wasm?url';
 
-// These are Vite-emitted same-origin asset URLs. Always pass both explicitly:
-// @ffmpeg/ffmpeg otherwise defaults to a remote unpkg.com core URL.
+// Core JavaScript is emitted by Vite. The large WASM is split and integrity-checked
+// at runtime only after the user starts a conversion.
 export const FFMPEG_CORE_URL = coreURL;
-export const FFMPEG_WASM_URL = wasmURL;
+export const FFMPEG_WASM_MANIFEST_URL = `${import.meta.env.BASE_URL}ffmpeg-core/manifest.json`;

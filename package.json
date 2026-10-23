@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/split-media-wasm.mjs",
     "dev": "vite --host 0.0.0.0",
+    "prebuild": "node scripts/split-media-wasm.mjs",
     "test": "node --test",
-    "build": "tsc && vite build && node scripts/prerender.mjs && node scripts/verify-media-assets.mjs",
+    "test:browser": "node scripts/run-media-converter-browser-check.mjs",
+    "build": "tsc && vite build && node scripts/prerender.mjs && node scripts/verify-media-assets.mjs && node scripts/check-asset-sizes.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
@@ -24,6 +27,8 @@
     "upng-js": "^2.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@sparticuz/chromium": "^153.0.0",
     "@types/node": "^22.7.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
