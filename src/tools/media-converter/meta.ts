@@ -3,6 +3,11 @@ export const meta = {
   name: 'Media Converter',
   description: 'Convert small MP4, WebM, MP3, WAV, and OGG files locally in your browser with FFmpeg WebAssembly. Codec support varies; no media upload is performed.',
   category: 'Media',
+  privacy: {
+    mode: 'local',
+    label: 'Local media conversion',
+    description: 'Your media is processed in this browser and is not uploaded. The FFmpeg worker and integrity-checked core parts load from this site when you start a conversion.',
+  },
   keywords: [
     'media converter',
     'video converter',

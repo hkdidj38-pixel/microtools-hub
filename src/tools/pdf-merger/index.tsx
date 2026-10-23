@@ -6,7 +6,6 @@ import {
   Download,
   FileText,
   LoaderCircle,
-  ShieldCheck,
   Trash2,
   UploadCloud,
   X,
@@ -218,6 +217,7 @@ export default function PdfMergerTool() {
   };
 
   const totalPages = pdfs.reduce((sum, entry) => sum + (entry.pageCount ?? 0), 0);
+  const totalBytes = pdfs.reduce((sum, entry) => sum + entry.file.size, 0);
   const isEstimating = pdfs.some((entry) => entry.isEstimating);
   const hasInvalidPdf = pdfs.some((entry) => entry.error);
   const exceedsPageLimit = totalPages > MAX_PDF_BATCH_PAGES;
@@ -242,7 +242,7 @@ export default function PdfMergerTool() {
           if (!isMerging) addFiles(event.dataTransfer.files);
         }}
         onClick={() => !isMerging && fileInputRef.current?.click()}
-        className={`rounded-2xl border-2 border-dashed p-5 text-center transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 sm:p-10 ${isMerging ? 'cursor-not-allowed border-line bg-paper opacity-60' : 'cursor-pointer border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
+        className={`rounded-2xl border-2 border-dashed p-5 text-center transition sm:p-10 ${isMerging ? 'cursor-not-allowed border-line bg-paper opacity-60' : 'cursor-pointer border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
       >
         <input
           ref={fileInputRef}
@@ -259,15 +259,11 @@ export default function PdfMergerTool() {
           }}
           disabled={isMerging}
         />
+        <p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">01 · Add documents</p>
         <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
         <p className="font-bold text-ink">Drop PDF files here or click to browse</p>
         <p className="mt-1 text-xs text-muted">Add multiple PDFs, then organize them in the order you want.</p>
         <p className="mt-1 text-xs text-muted">Maximum 50 files · 50 MB each · 150 MB total · {MAX_PDF_BATCH_PAGES.toLocaleString()} pages</p>
-      </div>
-
-      <div className="flex items-start gap-2 rounded-lg bg-paper px-3.5 py-3 text-xs leading-relaxed text-muted">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
-        <p><strong className="text-ink">Private by design.</strong> Files are read and merged locally in your browser using pdf-lib. Nothing is uploaded.</p>
       </div>
 
       {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
@@ -278,9 +274,10 @@ export default function PdfMergerTool() {
         <section aria-label="PDF merge order" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-ink">Files to merge <span className="text-muted">({pdfs.length})</span></h2>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">02 · Arrange</p>
+              <h2 className="mt-1 text-base font-bold text-ink">Merge order <span className="text-muted">({pdfs.length} files)</span></h2>
               <p className="mt-0.5 text-xs text-muted">
-                {isEstimating ? 'Calculating page counts…' : `${totalPages} ${totalPages === 1 ? 'page' : 'pages'} total`}
+                {isEstimating ? 'Calculating page counts…' : `${totalPages} ${totalPages === 1 ? 'page' : 'pages'} · ${formatPdfBytes(totalBytes)} total`}
                 {isEstimating && <LoaderCircle className="ml-1 inline h-3 w-3 animate-spin" aria-hidden="true" />}
               </p>
             </div>
@@ -296,7 +293,7 @@ export default function PdfMergerTool() {
           <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
             {pdfs.map((entry, index) => (
               <li key={entry.id} className="flex min-w-0 items-center gap-3 p-3 sm:gap-4 sm:p-4">
-                <span className="w-6 shrink-0 text-center text-xs font-semibold text-muted/80">{index + 1}</span>
+                <span className="w-6 shrink-0 text-center text-xs font-semibold text-muted">{index + 1}</span>
                 <FileText className="h-8 w-8 shrink-0 text-rose-600" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink" title={entry.file.name}>{entry.file.name}</p>

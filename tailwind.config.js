@@ -4,16 +4,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#15251d',
-        muted: '#64746a',
-        paper: '#f5f7f2',
-        line: '#e1e8e0',
+        ink: 'rgb(var(--hub-ink-rgb) / <alpha-value>)',
+        muted: 'rgb(var(--hub-muted-rgb) / <alpha-value>)',
+        paper: 'rgb(var(--hub-paper-rgb) / <alpha-value>)',
+        line: 'rgb(var(--hub-line-rgb) / <alpha-value>)',
         brand: {
-          DEFAULT: '#286247',
-          dark: '#1d5039',
-          soft: '#edf5ee',
+          DEFAULT: 'rgb(var(--hub-brand-rgb) / <alpha-value>)',
+          dark: 'rgb(var(--hub-brand-dark-rgb) / <alpha-value>)',
+          soft: 'rgb(var(--hub-brand-soft-rgb) / <alpha-value>)',
         },
-        lime: '#d9f27a',
+        lime: 'rgb(var(--hub-lime-rgb) / <alpha-value>)',
       },
       boxShadow: {
         soft: '0 16px 44px rgba(21, 37, 29, 0.07)',

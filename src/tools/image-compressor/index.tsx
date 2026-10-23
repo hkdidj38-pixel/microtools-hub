@@ -6,7 +6,6 @@ import {
   FileImage,
   LoaderCircle,
   RefreshCw,
-  ShieldCheck,
   Trash2,
   UploadCloud,
 } from 'lucide-react';
@@ -279,8 +278,16 @@ export default function ImageCompressorTool() {
     : 0;
 
   return (
-    <div className="tool-workspace space-y-6">
-      <div className="grid gap-5 rounded-xl border border-line bg-paper p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
+    <div className="tool-workspace space-y-5 sm:space-y-6">
+      <section className="rounded-2xl border border-line bg-paper/55 p-4 sm:p-5" aria-labelledby="image-settings-heading">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">01 · Configure</p>
+            <h2 id="image-settings-heading" className="mt-1 text-sm font-extrabold text-ink">Compression settings</h2>
+          </div>
+          <p className="text-xs text-muted">Changes apply to the next compression run.</p>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label htmlFor="quality" className="mb-2 block text-xs font-semibold text-ink">
             Compression quality <span className="ml-1 text-brand">{quality}%</span>
@@ -324,9 +331,15 @@ export default function ImageCompressorTool() {
             {isProcessing ? 'Compressing…' : 'Apply & re-compress'}
           </button>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div
+      <section aria-labelledby="image-files-heading" className="space-y-3">
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">02 · Add files</p>
+          <h2 id="image-files-heading" className="mt-1 text-sm font-extrabold text-ink">Choose images to compress</h2>
+        </div>
+        <div
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
@@ -357,12 +370,8 @@ export default function ImageCompressorTool() {
             event.target.value = '';
           }}
         />
-      </div>
-
-      <div className="flex items-start gap-2 rounded-lg bg-paper px-3.5 py-3 text-xs leading-relaxed text-muted">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
-        <p><strong className="text-ink">Private by design.</strong> Image data is processed on your device; nothing is uploaded. Large images may take a moment to process.</p>
-      </div>
+        </div>
+      </section>
 
       {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
       {errorMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMsg}</p>}

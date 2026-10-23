@@ -11,6 +11,11 @@ export interface ToolMeta {
   description: string;
   category: string;
   keywords: string[];
+  privacy: {
+    mode: 'local' | 'edge';
+    label: string;
+    description: string;
+  };
   faqs: ToolFAQ[];
 }
 

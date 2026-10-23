@@ -1,0 +1,48 @@
+/* Shared palette tokens for the React app and standalone utility pages. */
+:root {
+  --hub-ink-rgb: 23 37 29;
+  --hub-muted-rgb: 98 110 101;
+  --hub-paper-rgb: 246 247 242;
+  --hub-surface-rgb: 255 254 250;
+  --hub-line-rgb: 223 230 220;
+  --hub-brand-rgb: 36 91 67;
+  --hub-brand-dark-rgb: 25 70 49;
+  --hub-brand-soft-rgb: 237 243 232;
+  --hub-lime-rgb: 216 237 145;
+  --hub-focus-inner-rgb: 216 237 145;
+  --hub-focus-outer-rgb: 36 91 67;
+
+  --hub-ink: rgb(var(--hub-ink-rgb));
+  --hub-muted: rgb(var(--hub-muted-rgb));
+  --hub-paper: rgb(var(--hub-paper-rgb));
+  --hub-surface: rgb(var(--hub-surface-rgb));
+  --hub-line: rgb(var(--hub-line-rgb));
+  --hub-brand: rgb(var(--hub-brand-rgb));
+  --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
+  --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
+  --hub-lime: rgb(var(--hub-lime-rgb));
+}
+
+[data-theme="dark"] {
+  --hub-ink-rgb: 237 244 232;
+  --hub-muted-rgb: 160 176 159;
+  --hub-paper-rgb: 16 26 20;
+  --hub-surface-rgb: 24 37 28;
+  --hub-line-rgb: 48 65 52;
+  --hub-brand-rgb: 184 223 131;
+  --hub-brand-dark-rgb: 203 237 158;
+  --hub-brand-soft-rgb: 41 59 46;
+  --hub-lime-rgb: 217 242 122;
+  --hub-focus-inner-rgb: 217 242 122;
+  --hub-focus-outer-rgb: 184 223 131;
+
+  --hub-ink: rgb(var(--hub-ink-rgb));
+  --hub-muted: rgb(var(--hub-muted-rgb));
+  --hub-paper: rgb(var(--hub-paper-rgb));
+  --hub-surface: rgb(var(--hub-surface-rgb));
+  --hub-line: rgb(var(--hub-line-rgb));
+  --hub-brand: rgb(var(--hub-brand-rgb));
+  --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
+  --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
+  --hub-lime: rgb(var(--hub-lime-rgb));
+}

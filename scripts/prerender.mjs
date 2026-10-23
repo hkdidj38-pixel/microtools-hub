@@ -96,6 +96,10 @@ for (const folder of folders) {
         <span class="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-600">${esc(meta.category)}</span>
         <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">${esc(meta.name)}</h1>
         <p class="mt-2 max-w-3xl text-base text-slate-600 sm:text-lg">${esc(meta.description)}</p>
+        <aside class="mt-5 rounded-2xl border border-brand/15 bg-brand-soft p-4 text-sm leading-6 text-brand-dark" aria-label="How this tool handles your data">
+          <strong>${esc(meta.privacy?.label || 'Processing details')}</strong>
+          <p>${esc(meta.privacy?.description || 'See this tool’s interface for processing details.')}</p>
+        </aside>
       </div>
       <section aria-labelledby="faq-heading" class="mb-12">
         <h2 id="faq-heading" class="mb-4 text-xl font-bold text-slate-900">Frequently Asked Questions</h2>
