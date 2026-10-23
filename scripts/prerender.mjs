@@ -108,7 +108,7 @@ for (const folder of folders) {
           `).join('')}
         </div>
       </section>
-      <noscript><p>This tool requires JavaScript. Image and PDF files stay on your device; URL inspection uses a disclosed edge fetch.</p></noscript>
+      <noscript><p>This tool requires JavaScript. Image, PDF, and media files are processed on your device; URL inspection uses a disclosed edge fetch.</p></noscript>
     </main>`;
 
   const pageHtml = baseHtml
