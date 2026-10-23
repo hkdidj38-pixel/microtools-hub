@@ -1,10 +1,16 @@
 export const meta = {
   slug: 'url-screenshot',
-  name: 'Website Preview & Edge Telemetry Inspector',
-  description: 'Inspect an approved HTTPS page’s title, description, response headers, and Cloudflare edge region telemetry with a privacy-conscious serverless inspector.',
+  name: 'URL Metadata & Edge Telemetry Inspector',
+  description: 'Inspect an approved HTTPS page’s title, description, response headers, and Cloudflare edge region telemetry through a fail-closed edge path. Secure egress configuration is required.',
   category: 'Developer',
+  privacy: {
+    mode: 'edge',
+    label: 'Disclosed edge request',
+    description: 'The submitted URL is sent to this site’s Cloudflare Function and configured egress service for a limited metadata fetch from an approved host. Browser cookies and authorization headers are not forwarded. Avoid private URLs and secret query strings. Inspection stays unavailable unless secure egress is configured.',
+  },
   keywords: [
-    'website preview inspector',
+    'url metadata inspector',
+    'website metadata inspection',
     'http response headers',
     'cloudflare edge telemetry',
     'serverless page metadata',

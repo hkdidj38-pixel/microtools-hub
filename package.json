@@ -9,6 +9,7 @@
     "prebuild": "node scripts/split-media-wasm.mjs",
     "test": "node --test",
     "test:browser": "node scripts/run-media-converter-browser-check.mjs",
+    "test:ui": "node scripts/run-product-ui-check.mjs",
     "build": "tsc && vite build && node scripts/prerender.mjs && node scripts/verify-media-assets.mjs && node scripts/check-asset-sizes.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },

@@ -3,6 +3,11 @@ export const meta = {
   name: 'Image Compressor (PNG, JPG, WebP)',
   description: 'Compress PNG, JPG, and WebP images directly in your browser. Private client-side compression with batch ZIP download; savings depend on the image and settings.',
   category: 'Images',
+  privacy: {
+    mode: 'local',
+    label: 'Local image processing',
+    description: 'Images are compressed in your browser and are not uploaded. Large images may take a moment to process.',
+  },
   keywords: [
     'compress png',
     'image compressor',

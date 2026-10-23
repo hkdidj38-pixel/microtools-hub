@@ -82,21 +82,33 @@ function HomePage() {
           <div className="hub-container relative grid min-w-0 gap-8 py-10 sm:gap-12 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:py-24">
             <div className="w-full min-w-0 max-w-3xl">
               <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-lime sm:mb-6 sm:px-3.5 sm:text-xs sm:tracking-[0.16em]">
-                <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_14px_rgba(217,242,122,.75)]" />
-                A calmer kind of toolbox
+                <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_14px_rgba(216,237,145,.7)]" />
+                A considered little workbench
               </div>
-              <h1 className="max-w-full text-[clamp(1.75rem,8.2vw,3rem)] font-black leading-[1.06] tracking-[-0.04em] [overflow-wrap:anywhere] sm:text-5xl lg:text-6xl">
-                Small tools.<br /><span className="text-lime">Serious momentum.</span>
+              <h1 className="max-w-full text-[clamp(1.8rem,8.2vw,3.2rem)] font-black leading-[1.04] tracking-[-0.045em] [overflow-wrap:anywhere] sm:text-5xl lg:text-6xl">
+                Make small work<br /><span className="text-lime">feel effortless.</span>
               </h1>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-white/70 sm:mt-6 sm:text-lg sm:leading-8">
-                The useful little utilities that turn busywork into done—without the clutter, accounts, or unnecessary uploads.
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/70 sm:mt-5 sm:text-lg sm:leading-8">
+                Image, PDF, media, metadata, and writing tools—easy to reach and clear about how they handle your data.
               </p>
-              <a href="#toolbox" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-extrabold text-ink shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-[#e3f99a] focus-visible:outline-white sm:mt-8 sm:min-h-12 sm:rounded-2xl sm:px-5 sm:py-3">
-                Find your next tool <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </a>
+              <div className="mt-6 max-w-xl sm:mt-8">
+                <label htmlFor="tool-search" className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-white/65">Find a tool</label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand" aria-hidden="true" />
+                  {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-xl text-muted hover:bg-paper hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /></button>}
+                  <input
+                    id="tool-search"
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search image, PDF, media…"
+                    className="hub-input min-h-12 rounded-2xl border-white/70 bg-white pl-12 pr-12 text-sm shadow-lg shadow-black/10 sm:min-h-14"
+                  />
+                </div>
+              </div>
               <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-white/55 sm:mt-5">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden="true" />
-                <span>Files and text stay in your browser; URL inspection is disclosed before its edge fetch.</span>
+                <span>Image, PDF, media, and text work stays in your browser. URL inspection sends the submitted URL through a disclosed edge path.</span>
               </p>
             </div>
 
@@ -105,19 +117,19 @@ function HomePage() {
               <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.07] p-4 shadow-2xl backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
                 <div className="flex items-start justify-between gap-3 sm:gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">Your utility shelf</p>
-                    <p className="mt-2 break-words text-xl font-black tracking-tight text-white sm:text-2xl">Ready when you are.</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lime">Quick access</p>
+                    <p className="mt-2 break-words text-xl font-black tracking-tight text-white sm:text-2xl">A little less busywork.</p>
                   </div>
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime text-ink"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3">
                   <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
                     <p className="text-2xl font-black tracking-tight text-lime sm:text-3xl">{TOOLS_REGISTRY.length}</p>
-                    <p className="mt-1 text-xs font-medium text-white/60">React tools</p>
+                    <p className="mt-1 text-xs font-medium text-white/70">registered tools</p>
                   </div>
                   <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
                     <p className="text-2xl font-black tracking-tight text-lime sm:text-3xl">{categoryCount}</p>
-                    <p className="mt-1 text-xs font-medium text-white/60">Real categories</p>
+                    <p className="mt-1 text-xs font-medium text-white/70">tool categories</p>
                   </div>
                 </div>
                 <div className="mt-3 space-y-2">
@@ -128,7 +140,7 @@ function HomePage() {
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lime"><Icon className="h-5 w-5" aria-hidden="true" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-bold text-white">{tool.name}</span>
-                          <span className="mt-0.5 block truncate text-xs text-white/50">{tool.category}</span>
+                          <span className="mt-0.5 block truncate text-xs text-white/70">{tool.category}</span>
                         </span>
                         <ArrowUpRight className="h-4 w-4 shrink-0 text-white/35 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-lime" aria-hidden="true" />
                       </Link>
@@ -141,27 +153,15 @@ function HomePage() {
         </section>
 
         <section id="toolbox" className="hub-container min-w-0 scroll-mt-20 py-10 sm:scroll-mt-24 sm:py-20">
-          <div className="flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end">
+          <div className="flex min-w-0 flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 max-w-2xl">
-              <p className="hub-eyebrow">The good stuff</p>
-              <h2 className="mt-3 text-[clamp(1.65rem,7vw,2.25rem)] font-black tracking-[-0.035em] text-ink sm:text-4xl">Find the right tool.</h2>
-              <p className="mt-3 text-sm leading-6 text-muted sm:text-base">A small, focused collection for the tasks that interrupt your flow.</p>
+              <p className="hub-eyebrow">The toolkit</p>
+              <h2 className="mt-3 text-[clamp(1.65rem,7vw,2.25rem)] font-black tracking-[-0.035em] text-ink sm:text-4xl">Pick up where work needs you.</h2>
+              <p className="mt-3 text-sm leading-6 text-muted sm:text-base">Focused helpers for the little tasks that break your flow.</p>
             </div>
-            <div className="w-full min-w-0 lg:max-w-md">
-              <label htmlFor="tool-search" className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-muted">Search the toolbox</label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden="true" />
-                {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-muted hover:bg-paper hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /></button>}
-                <input
-                  id="tool-search"
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Try PDF, compress, or headers…"
-                  className="hub-input min-h-12 pl-12 pr-12 text-sm sm:min-h-14"
-                />
-              </div>
-            </div>
+            <a href="#classic-tools" className="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2 text-xs font-extrabold text-ink transition hover:border-brand/30 hover:text-brand">
+              Browse classic tools <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </a>
           </div>
 
           <div className="mt-7 flex flex-wrap gap-2" role="group" aria-label="Filter tools by category">
@@ -176,7 +176,7 @@ function HomePage() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setSelectedCategory(category)}
-                  className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 sm:gap-2 sm:px-4 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
+                  className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition sm:gap-2 sm:px-4 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
                 >
                   {category}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/15 text-lime' : 'bg-paper text-muted'}`}>{count}</span>
                 </button>
@@ -190,11 +190,11 @@ function HomePage() {
           </div>
 
           {filteredTools.length ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {filteredTools.map((tool) => {
                 const Icon = toolIcons[tool.slug] ?? Sparkles;
                 return (
-                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-w-0 flex-col rounded-3xl border border-line bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:min-h-[16rem] sm:rounded-[1.75rem] sm:p-6">
+                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-w-0 flex-col rounded-3xl border border-line bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift sm:min-h-[16rem] sm:rounded-[1.75rem] sm:p-6">
                     <div className="flex items-start justify-between gap-4">
                       <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand transition group-hover:bg-lime group-hover:text-ink"><Icon className="h-5 w-5" aria-hidden="true" /></span>
                       <span className="rounded-full bg-paper px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">{tool.category}</span>
@@ -230,7 +230,7 @@ function HomePage() {
             </div>
             <div className="mt-4 grid min-w-0 gap-2.5 sm:mt-6 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
               {legacyTools.map(({ name, slug, description, icon: Icon }) => (
-                <a key={slug} href={`/${slug}/`} className="group min-w-0 rounded-2xl border border-line bg-paper/70 p-3 transition hover:border-brand/25 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:p-4">
+                <a key={slug} href={`/${slug}/`} className="group min-w-0 rounded-2xl border border-line bg-paper/70 p-3 transition hover:border-brand/25 hover:bg-brand-soft/50 sm:p-4">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-brand shadow-sm transition group-hover:bg-brand group-hover:text-white sm:h-10 sm:w-10"><Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" /></span>
                   <span className="mt-3 flex min-w-0 items-center justify-between gap-2 text-sm font-extrabold text-ink sm:mt-4">{name}<ArrowUpRight className="h-4 w-4 shrink-0 text-muted transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand" aria-hidden="true" /></span>
                   <span className="mt-1 block text-xs leading-5 text-muted">{description}</span>
@@ -245,8 +245,8 @@ function HomePage() {
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
             <div>
               <p className="hub-eyebrow">Privacy, without the fine print</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-ink">Your files stay yours.</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Image, PDF, and text utilities run in your browser. The URL inspector is different: it sends the URL you enter to a Cloudflare Function to fetch limited page metadata. It does not forward your browser cookies or authorization headers.</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-ink">Local by default. Clear when it isn’t.</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Image, PDF, media, and text work stays in your browser. The URL Inspector is different: your submitted URL goes to this site’s Cloudflare Function and configured egress service for a limited metadata fetch from approved hosts. Browser cookies and authorization headers are not forwarded; avoid private URLs and secret query strings. Inspection stays unavailable until secure egress is configured.</p>
               <a href="#toolbox" className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand hover:underline">Back to the toolbox <ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
             </div>
           </div>

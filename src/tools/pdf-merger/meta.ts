@@ -1,8 +1,13 @@
 export const meta = {
   slug: 'pdf-merger',
   name: 'PDF Merger & Page Organizer',
-  description: 'Combine multiple PDF files into a single document instantly in your browser. 100% private, client-side PDF joining using pdf-lib with zero server uploads.',
+  description: 'Combine multiple PDF files into one document in your browser. Client-side PDF joining with pdf-lib; your documents are not uploaded.',
   category: 'PDF',
+  privacy: {
+    mode: 'local',
+    label: 'Local PDF processing',
+    description: 'PDF files are read and merged in your browser. Your documents are not uploaded.',
+  },
   keywords: [
     'merge pdf',
     'combine pdf files',
