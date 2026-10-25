@@ -286,11 +286,44 @@ try {
   console.log(`[browser] synthetic WAV converted and downloaded as MP3 (${fs.statSync(mp3Output).size} bytes)`);
 
   await fileInput.setInputFiles(path.join(tempRoot, 'synthetic-long.mp4'));
+  await page.evaluate(() => {
+    const checkpoint = { execDispatched: false, cancelClicked: false, workerTerminated: false };
+    window.mediaCancellationCheckpoint = checkpoint;
+    const postMessage = Worker.prototype.postMessage;
+    const terminate = Worker.prototype.terminate;
+    let conversionWorker;
+    Worker.prototype.postMessage = function (message, ...args) {
+      const result = postMessage.call(this, message, ...args);
+      if (message?.type === 'EXEC') {
+        conversionWorker = this;
+        checkpoint.execDispatched = true;
+        Worker.prototype.postMessage = postMessage;
+        // Let FFmpeg register the pending request before cancelling. A progress
+        // bar can disappear before Playwright sees it on these small fixtures.
+        queueMicrotask(() => {
+          const cancel = [...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Cancel conversion');
+          if (cancel && !cancel.disabled) {
+            cancel.click();
+            checkpoint.cancelClicked = true;
+          }
+        });
+      }
+      return result;
+    };
+    Worker.prototype.terminate = function (...args) {
+      if (this === conversionWorker) {
+        checkpoint.workerTerminated = true;
+        Worker.prototype.terminate = terminate;
+      }
+      return terminate.call(this, ...args);
+    };
+  });
   await page.getByRole('button', { name: 'Convert media' }).click();
-  await page.getByRole('progressbar', { name: 'Approximate conversion progress' }).waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Cancel conversion' }).click();
   await page.getByText(/conversion cancelled/i).waitFor({ timeout: 10_000 });
-  console.log('[browser] cancel terminates an active in-browser FFmpeg conversion');
+  assert.deepEqual(await page.evaluate(() => window.mediaCancellationCheckpoint), {
+    execDispatched: true, cancelClicked: true, workerTerminated: true,
+  }, 'Cancel should stop the same real worker after dispatching a conversion.');
+  console.log('[browser] cancel stops a dispatched FFmpeg conversion and terminates its worker');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('heading', { name: '1. Select one media file' }).waitFor();

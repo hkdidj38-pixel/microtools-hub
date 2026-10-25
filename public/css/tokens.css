@@ -1,4 +1,4 @@
-/* Shared design tokens for the React app and standalone utility pages. */
+/* Shared palette tokens for the React app and standalone utility pages. */
 :root {
   --hub-ink-rgb: 23 37 29;
   --hub-muted-rgb: 98 110 101;
@@ -21,21 +21,6 @@
   --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
   --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
   --hub-lime: rgb(var(--hub-lime-rgb));
-
-  --hub-gutter: clamp(0.75rem, 3vw, 2rem);
-  --hub-radius-control: 0.875rem;
-  --hub-radius-card: 1.5rem;
-  --hub-radius-panel: 2rem;
-  --hub-type-display: clamp(2.25rem, 5.2vw, 4.25rem);
-  --hub-type-section: clamp(1.75rem, 3vw, 2.5rem);
-  --hub-type-page: clamp(1.85rem, 5vw, 3.25rem);
-  --hub-motion-fast: 140ms;
-  --hub-motion-base: 220ms;
-  --hub-motion-enter: 360ms;
-  --hub-ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --hub-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
-  --hub-shadow-soft: 0 16px 44px rgb(23 37 29 / 7%);
-  --hub-shadow-lift: 0 22px 48px rgb(23 37 29 / 12%);
 }
 
 [data-theme="dark"] {
@@ -60,7 +45,4 @@
   --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
   --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
   --hub-lime: rgb(var(--hub-lime-rgb));
-
-  --hub-shadow-soft: 0 16px 44px rgb(0 0 0 / 18%);
-  --hub-shadow-lift: 0 22px 48px rgb(0 0 0 / 28%);
 }
