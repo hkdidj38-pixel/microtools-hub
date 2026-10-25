@@ -18,6 +18,7 @@ import {
   validateMediaFile,
 } from './formats';
 import type { ConversionProgress, ConversionResult, MediaFormat, MediaOperation } from './types';
+import { runWithViewTransition } from '@/lib/motion';
 
 const ACCEPTED_TYPES = '.mp4,.webm,.mp3,.wav,.ogg,.oga,video/mp4,video/webm,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,application/ogg';
 
@@ -46,6 +47,7 @@ export default function MediaConverterTool() {
   const engineRef = useRef<MediaConverterEngine | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [operation, setOperation] = useState<MediaOperation>('video-convert');
   const [outputFormat, setOutputFormat] = useState<MediaFormat>('webm');
   const [quality, setQuality] = useState(DEFAULT_VIDEO_QUALITY);
@@ -197,6 +199,7 @@ export default function MediaConverterTool() {
 
   const onDrop = (event: React.DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
+    setIsDragging(false);
     if (isBusy) return;
     if (event.dataTransfer.files.length > 1) {
       setError('Choose or drop one file at a time.');
@@ -225,13 +228,24 @@ export default function MediaConverterTool() {
       <section aria-labelledby="media-file-heading">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="media-file-heading" className="text-sm font-bold text-ink">1. Select one media file</h2>
-          {file && !isBusy && <button type="button" onClick={clearAll} className="hub-button-secondary min-h-9 px-3 py-2 text-xs">Clear</button>}
+          {file && !isBusy && <button type="button" onClick={() => runWithViewTransition(clearAll)} className="hub-button-secondary min-h-9 px-3 py-2 text-xs">Clear</button>}
         </div>
         <label
           htmlFor="media-file"
-          onDragOver={(event) => event.preventDefault()}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (!isBusy) setIsDragging(true);
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={(event) => {
+            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setIsDragging(false);
+          }}
           onDrop={onDrop}
-          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition ${isBusy ? 'cursor-not-allowed border-line bg-paper/60 opacity-70' : 'border-brand/30 bg-brand-soft/40 hover:border-brand hover:bg-brand-soft/70'}`}
+          data-dragging={isDragging}
+          className={`hub-dropzone flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center ${isBusy ? 'cursor-not-allowed border-line bg-paper/60 opacity-70' : isDragging ? 'border-brand bg-brand-soft ring-2 ring-brand/20' : 'border-brand/30 bg-brand-soft/40 hover:border-brand hover:bg-brand-soft/70'}`}
         >
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm">
             {fileFormat && FORMAT_INFO[fileFormat].kind === 'audio'
@@ -255,7 +269,7 @@ export default function MediaConverterTool() {
         </label>
 
         {file && fileFormat && (
-          <div className="mt-3 grid gap-2 rounded-2xl border border-line bg-paper/60 p-4 text-sm sm:grid-cols-2" aria-label="Selected file information">
+          <div className="hub-file-list--media mt-3 grid gap-2 rounded-2xl border border-line bg-paper/60 p-4 text-sm motion-safe:animate-hub-enter sm:grid-cols-2" aria-label="Selected file information">
             <p className="min-w-0 break-words"><span className="font-semibold text-muted">File:</span> <span className="text-ink">{file.name}</span></p>
             <p><span className="font-semibold text-muted">Size:</span> <span className="text-ink">{formatBytes(file.size)}</span></p>
             <p><span className="font-semibold text-muted">Detected from extension:</span> <span className="uppercase text-ink">{fileFormat}</span></p>
@@ -265,7 +279,7 @@ export default function MediaConverterTool() {
       </section>
 
       {file && (
-        <section aria-labelledby="media-settings-heading" className="space-y-4">
+        <section aria-labelledby="media-settings-heading" className="space-y-4 motion-safe:animate-hub-enter">
           <h2 id="media-settings-heading" className="text-sm font-bold text-ink">2. Choose conversion settings</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -347,7 +361,7 @@ export default function MediaConverterTool() {
           <span>{status}</span>
         </p>
         {downloadProgress && isBusy && (
-          <div className="mt-3 rounded-xl border border-line bg-white p-3">
+          <div className="mt-3 rounded-xl border border-line bg-white p-3 motion-safe:animate-hub-enter">
             <div className="mb-1 flex justify-between gap-3 text-xs text-muted">
               <span>Downloading FFmpeg core (~32 MB, one-time per browser cache)</span>
               <span>{Math.round(downloadProgress.progress * 100)}%</span>
@@ -369,10 +383,10 @@ export default function MediaConverterTool() {
           </div>
         )}
         {error && (
-          <p className="mt-3 flex items-start gap-2 text-sm text-red-700" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>
+          <p className="hub-notification--error mt-3 flex items-start gap-2 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>
         )}
         {result && outputURLRef.current && (
-          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="hub-results-panel--media mt-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-white p-3 motion-safe:animate-hub-enter sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="break-words text-sm font-bold text-ink">{result.fileName}</p>
               <p className="mt-1 text-xs text-muted">{result.outputFormat.toUpperCase()} · {formatBytes(result.outputSize)}</p>
