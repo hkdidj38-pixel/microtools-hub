@@ -176,6 +176,24 @@ try {
   }
   console.log(`[ui] all ${pages.length} pages are overflow-free at ${viewports.join(', ')}px; responsive screenshots captured for 320, 390, 768, and 1440px`);
 
+  // Cross-route fragment links must reach the toolbox after client navigation.
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 980 });
+    for (const name of ['Browse tools', 'Explore more tools', 'Back to all tools']) {
+      if (width === 390 && name === 'Browse tools') continue;
+      await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });
+      await page.getByRole('link', { name, exact: true }).click();
+      await page.waitForURL(`${baseURL}/#toolbox`);
+      await page.waitForFunction(() => {
+        const target = document.getElementById('toolbox');
+        if (!target) return false;
+        const top = target.getBoundingClientRect().top;
+        return window.scrollY > 0 && top >= 0 && top <= 200;
+      }, null, { timeout: 5000 });
+    }
+  }
+  console.log('[ui] tool-page fragment links reach the toolbox at mobile and desktop widths');
+
   // Registry-driven discovery, category filters, empty state, and direct routes.
   await page.setViewportSize({ width: 1440, height: 980 });
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
@@ -281,6 +299,9 @@ try {
   await pdfFaq.focus();
   await pdfFaq.press('Enter');
   assert.equal(await page.locator('details').first().evaluate((element) => element.open), true, 'Native FAQ disclosure should open from the keyboard.');
+  await page.getByRole('button', { name: 'Remove alpha.pdf' }).click();
+  await page.getByRole('button', { name: 'Remove alpha.pdf' }).waitFor({ state: 'detached' });
+  assert.equal(await page.getByRole('link', { name: 'Download merged PDF' }).count(), 0, 'Removing a source PDF should clear its previous merge result.');
   console.log('[ui] PDF pages counted, keyboard reorder, merged output downloaded, output page count and keyboard FAQ verified');
 
   // The inspector must remain a metadata/edge tool and fail closed in this static preview.

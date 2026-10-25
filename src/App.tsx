@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -16,7 +16,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { BrowserRouter, Link, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, Link, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { TOOLS_REGISTRY } from '@/lib/registry';
 import { ToolLayout } from '@/components/ToolLayout';
 
@@ -33,6 +33,24 @@ const toolIcons: Record<string, LucideIcon> = {
   'url-screenshot': Globe2,
   'media-converter': Film,
 };
+
+function ScrollToHash() {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash || hash === '#') return;
+    let targetId;
+    try {
+      targetId = decodeURIComponent(hash.slice(1));
+    } catch {
+      // A malformed fragment must not prevent the page from rendering.
+      return;
+    }
+    document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
+  }, [pathname, hash]);
+
+  return null;
+}
 
 function HomePage() {
   const [query, setQuery] = useState('');
@@ -303,6 +321,7 @@ function ToolRoute() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToHash />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/tools/:slug" element={<ToolRoute />} />
