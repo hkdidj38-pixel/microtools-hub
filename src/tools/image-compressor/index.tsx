@@ -18,6 +18,7 @@ import {
   type CompressedItem,
   type CompressionOptions,
 } from './logic';
+import { runWithViewTransition } from '@/lib/motion';
 
 const MAX_FILES = 50;
 const ACCEPTED_IMAGE = /\.(png|jpe?g|webp)$/i;
@@ -88,6 +89,7 @@ export default function ImageCompressorTool() {
   const [isZipping, setIsZipping] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const runIdRef = useRef(0);
   const zipRunIdRef = useRef(0);
@@ -340,17 +342,29 @@ export default function ImageCompressorTool() {
           <h2 id="image-files-heading" className="mt-1 text-sm font-extrabold text-ink">Choose images to compress</h2>
         </div>
         <div
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
-        }}
-      >
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (!isProcessing && rawFiles.length < MAX_FILES) setIsDragging(true);
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={(event) => {
+            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setIsDragging(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDragging(false);
+            if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
+          }}
+        >
         <button
           type="button"
           disabled={isProcessing || rawFiles.length >= MAX_FILES}
           onClick={() => fileInputRef.current?.click()}
-          className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-5 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
+          data-dragging={isDragging}
+          className={`hub-dropzone block w-full rounded-2xl border-2 border-dashed p-5 text-center disabled:cursor-not-allowed disabled:opacity-60 sm:p-10 ${isDragging ? 'border-brand bg-brand-soft ring-2 ring-brand/20' : 'border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
         >
           <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
           <span className="block font-bold text-ink">Drop images here or click to browse</span>
@@ -373,18 +387,18 @@ export default function ImageCompressorTool() {
         </div>
       </section>
 
-      {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
-      {errorMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMsg}</p>}
+      {notice && <p className="hub-notification--notice rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 motion-safe:animate-hub-enter" role="status">{notice}</p>}
+      {errorMsg && <p className="hub-notification--error rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert">{errorMsg}</p>}
 
       {isProcessing && (
-        <div className="flex items-center gap-3 rounded-xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
+        <div className="flex items-center gap-3 rounded-xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark motion-safe:animate-hub-enter" role="status" aria-live="polite">
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
           Compressing {rawFiles.length} {rawFiles.length === 1 ? 'image' : 'images'}… Keep this tab open until processing is complete.
         </div>
       )}
 
       {items.length > 0 && (
-        <section className="space-y-4" aria-label="Compressed images">
+        <section className="space-y-4 hub-results-panel--images motion-safe:animate-hub-enter" aria-label="Compressed images">
           <div className="flex flex-col justify-between gap-4 rounded-xl border border-brand/20 bg-brand-soft px-4 py-4 sm:flex-row sm:items-center sm:px-5">
             <div className="flex items-center gap-2.5">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
@@ -405,7 +419,7 @@ export default function ImageCompressorTool() {
               </button>
               <button
                 type="button"
-                onClick={handleClearAll}
+                onClick={() => runWithViewTransition(handleClearAll)}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2.5 text-xs font-semibold text-ink transition hover:bg-paper"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" /> Clear all
@@ -414,8 +428,8 @@ export default function ImageCompressorTool() {
           </div>
 
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
-            {items.map((item) => (
-              <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4">
+            {items.map((item, index) => (
+              <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4 motion-safe:animate-hub-card-enter" style={{ animationDelay: `${Math.min(index * 55, 165)}ms` }}>
                 <div className="flex min-w-0 items-center gap-3">
                   <ImageThumbnail blob={item.compressedBlob} />
                   <div className="min-w-0">
