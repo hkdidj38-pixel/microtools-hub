@@ -1,0 +1,204 @@
+{
+  "audit_id": "MICROTOOLS_HUB_FULL_REPOSITORY_AUDIT_V3",
+  "date": "2026-10-21",
+  "baseline": {
+    "local_branch": "qwen-code-3f0ae388-db89-403a-aa4d-5c9674fc2b0d (tracks arena/89d166e9-microtools-hub)",
+    "local_head_sha": "a08dbe17c56c6d067e40c287e00edca0f72319cd",
+    "github_default_branch": "main",
+    "main_tip_sha": "d30a6f69bbbb2369fcc35bd309c953ebaeb58543",
+    "working_tree_clean_at_start": true,
+    "node": "v20.20.2",
+    "npm": "10.8.2"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "title": "Prerender default SITE_URL points to non-existent origin",
+      "severity": "P2",
+      "classification": "CONFIRMED",
+      "file_and_line": "scripts/prerender.mjs:5",
+      "evidence": "Local npm run build emitted dist/sitemap.xml and canonicals on https://microtools-hub.pages.dev while production is https://microtools-hub-d6l.pages.dev (live HTTP 200; main branch already defaults correctly)",
+      "reproduction": "git checkout a08dbe17 && npm ci && npm run build && head dist/sitemap.xml",
+      "impact": "Wrong canonical URLs and sitemap when SITE_URL env var is not set",
+      "recommended_fix": "Default SITE_URL to https://microtools-hub-d6l.pages.dev",
+      "validation_status": "FIXED_AND_VALIDATED"
+    },
+    {
+      "id": "F-02",
+      "title": "Built dist/robots.txt retains stale hardcoded Sitemap URL",
+      "severity": "P2",
+      "classification": "CONFIRMED",
+      "file_and_line": "public/robots.txt:4; scripts/prerender.mjs (end of file)",
+      "evidence": "After baseline build, dist/robots.txt shows 'Sitemap: https://microtools-hub.pages.dev/sitemap.xml' unrelated to generated sitemap origin; prerender had no robots rewrite",
+      "reproduction": "npm run build && grep Sitemap dist/robots.txt",
+      "impact": "Crawlers directed at a sitemap URL that may not exist for the deployment origin",
+      "recommended_fix": "Rewrite Sitemap line in dist/robots.txt from SITE_URL during prerender (port of merged main implementation)",
+      "validation_status": "FIXED_AND_VALIDATED"
+    },
+    {
+      "id": "F-03",
+      "title": "Potential duplicate sitemap entries on slug collision",
+      "severity": "P4",
+      "classification": "UNVERIFIED",
+      "file_and_line": "scripts/prerender.mjs sitemapUrls assembly",
+      "evidence": "No duplicates in current 8-URL output; code path allows them if meta.slug equals a legacy route",
+      "reproduction": "n/a (latent)",
+      "impact": "Minor sitemap hygiene",
+      "recommended_fix": "Dedupe with Set before writing sitemap",
+      "validation_status": "FIXED_AS_PART_OF_F-02_PORT"
+    },
+    {
+      "id": "F-04",
+      "title": "DNS-rebinding-style SSRF residual risk in edge inspector",
+      "severity": "P4",
+      "classification": "UNVERIFIED",
+      "file_and_line": "functions/api/screenshot.ts validateTarget()",
+      "evidence": "Local harness (real source via esbuild) blocked all IP-literal/internal-TLD/rebinding-suffix probes but allowed public hostnames such as localhost.evil.com; exploitability requires attacker-controlled DNS and was NOT demonstrated",
+      "reproduction": "node harness with probe list (see AUDIT_REPORT.md P3/P5)",
+      "impact": "Theoretical private-address fetch via resolving hostname",
+      "recommended_fix": "Post-resolution IP-range checks (not feasible purely in Pages Function); consider Cloudflare access policies",
+      "validation_status": "NOT_FIXED_DOCUMENTED"
+    },
+    {
+      "id": "F-05",
+      "title": "PR #19 CI workflow based on arena branch, not main",
+      "severity": "P2",
+      "classification": "CONFIRMED",
+      "file_and_line": "GitHub PR #19 metadata; .github/workflows/ci.yml (head 5f57f21d7)",
+      "evidence": "API: base.ref=arena/89d166e9-microtools-hub@a08dbe17c; ci.yml triggers only on main push/PR; mergeable_state clean",
+      "reproduction": "curl https://api.github.com/repos/hkdidj38-pixel/microtools-hub/pulls/19",
+      "impact": "CI never executes unless the workflow lands on main",
+      "recommended_fix": "Merge PR #15 first, then retarget/land ci.yml on main",
+      "validation_status": "BLOCKED_REPORT_ONLY"
+    },
+    {
+      "id": "F-06",
+      "title": "PR #3 Tailwind v4 major bump incompatible with v3 config layout",
+      "severity": "P2",
+      "classification": "CONFIRMED",
+      "file_and_line": "PR #3 diff (package.json tailwindcss ^3.4.14 -> ^4.3.3); tailwind.config.js; postcss.config.js",
+      "evidence": "Repo uses classic v3 JS config + PostCSS plugin; Tailwind v4 changes this model; merging without migration breaks styling/build",
+      "reproduction": "Inspect pull/3.diff and repo config files",
+      "impact": "Broken build if merged as-is",
+      "recommended_fix": "Close/supersede PR; remediate selector-parser advisory within v3.x line",
+      "validation_status": "BLOCKED_REPORT_ONLY"
+    },
+    {
+      "id": "F-07",
+      "title": "url-screenshot naming implies image capture; endpoint returns metadata only",
+      "severity": "P3",
+      "classification": "CONFIRMED",
+      "file_and_line": "functions/api/screenshot.ts; src/tools/url-screenshot/",
+      "evidence": "Response schema contains title/description/headers only; no image bytes anywhere",
+      "reproduction": "GET /api/screenshot?url=https://example.com returns JSON telemetry",
+      "impact": "User expectation mismatch",
+      "recommended_fix": "Rename tool/route or add real screenshot capability",
+      "validation_status": "NOT_FIXED_OUT_OF_SCOPE"
+    },
+    {
+      "id": "F-08",
+      "title": "Documentation drift on pre-#17 branches",
+      "severity": "P3",
+      "classification": "CONFIRMED",
+      "file_and_line": "README.md:30; PROJECT_CONTEXT.md:109,150,177",
+      "evidence": "Docs describe old SITE_URL default/no-robots behavior; main already fixed by merged PR #17; open PR #18 updates docs accurately (verified against main source at d30a6f69b)",
+      "reproduction": "diff local README vs main prerender.mjs behavior",
+      "impact": "Misleading deployment guidance on older branches",
+      "recommended_fix": "Merge PR #18",
+      "validation_status": "BLOCKED_REPORT_ONLY"
+    },
+    {
+      "id": "F-09",
+      "title": "No automated test/lint suite; functions/ excluded from type-check",
+      "severity": "P4",
+      "classification": "CONFIRMED",
+      "file_and_line": "package.json scripts",
+      "evidence": "npm test undefined; tsconfig include=['src'] only; repo build passed but has zero regression coverage",
+      "reproduction": "cat package.json | jq .scripts",
+      "impact": "Silent regressions",
+      "recommended_fix": "Add lightweight test runner and include functions/ in a separate tsc pass",
+      "validation_status": "NOT_FIXED_POLICY_NO_NEW_FRAMEWORKS"
+    },
+    {
+      "id": "F-10",
+      "title": "SPA catch-all 200 fallback shadows true 404s",
+      "severity": "P4",
+      "classification": "UNVERIFIED",
+      "file_and_line": "public/_redirects:1",
+      "evidence": "'/* /index.html 200' serves app shell for arbitrary deep paths; live Pages serves static assets first so observed routes behaved correctly; Wrangler dev-loop caveat noted in PROJECT_CONTEXT",
+      "reproduction": "curl -o /dev/null -w %{http_code} <site>/<nonexistent-deep-path> returns 200 shell",
+      "impact": "Soft-404 SEO signal; dev-mode confusion",
+      "recommended_fix": "Evaluate Pages-specific 404 handling; no evidence supporting file deletion/change now",
+      "validation_status": "NOT_FIXED"
+    }
+  ],
+  "fixes_applied": [
+    {
+      "defect": "F-01",
+      "file": "scripts/prerender.mjs",
+      "change": "line 5 default SITE_URL -> https://microtools-hub-d6l.pages.dev",
+      "committed": false
+    },
+    {
+      "defect": "F-02/F-03",
+      "file": "scripts/prerender.mjs",
+      "change": "tail block: dedupe sitemap URLs; rewrite dist/robots.txt Sitemap line from SITE_URL (ported verbatim from main)",
+      "committed": false
+    }
+  ],
+  "validation_results": [
+    {
+      "check": "npm ci",
+      "result": "PASS"
+    },
+    {
+      "check": "npm run build (baseline)",
+      "result": "PASS exit 0"
+    },
+    {
+      "check": "npm run build (post-fix)",
+      "result": "PASS exit 0; dist/sitemap.xml + canonicals + dist/robots.txt all on microtools-hub-d6l origin; 8 unique URLs"
+    },
+    {
+      "check": "tsc --noEmit functions/api/screenshot.ts (strict)",
+      "result": "PASS exit 0"
+    },
+    {
+      "check": "SSRF validateTarget harness (20 probes)",
+      "result": "PASS all private/IP-literal/rebinding probes blocked"
+    },
+    {
+      "check": "logic unit checks (formatBytes/formatPdfBytes/merge guards/esc/xmlEsc/JSON-LD escaping)",
+      "result": "PASS (one initial FAIL reclassified as harness float-expectation artifact)"
+    },
+    {
+      "check": "git diff --check",
+      "result": "PASS clean"
+    },
+    {
+      "check": "npm audit (prod)",
+      "result": "PASS 0 vulnerabilities"
+    },
+    {
+      "check": "live production HTTP matrix",
+      "result": "PASS 200s; /tools/* 308->200 normalization"
+    },
+    {
+      "check": "post-fix rebuild diff review",
+      "result": "PASS: only scripts/prerender.mjs modified; dist/robots.txt, dist/sitemap.xml and canonicals verified on microtools-hub-d6l origin"
+    }
+  ],
+  "blocked_checks": [
+    "Full local git history (squashed snapshot; used GitHub API instead)",
+    "GitHub Actions run logs (no authenticated token)",
+    "Cloudflare Pages project settings / Search Console (no credentials; black-box HTTP only)",
+    "Any PR/branch-protection/deployment mutations (prohibited by policy)"
+  ],
+  "git_actions": {
+    "committed": false,
+    "pushed": false,
+    "merged": false,
+    "deployed": false,
+    "changes_left_uncommitted": true
+  }
+}
