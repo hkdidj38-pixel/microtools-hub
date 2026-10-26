@@ -1,19 +1,34 @@
-/* Shared visual tokens for the React app and standalone utility pages. */
+/* Shared visual tokens for the React app and standalone utility pages.
+   Palette: Premium Editorial Utility Workspace. */
 :root {
-  --hub-ink-rgb: 23 25 20;
-  --hub-muted-rgb: 98 105 97;
-  --hub-paper-rgb: 246 247 242;
+  --hub-ink-rgb: 32 37 30;
+  /* Tuned from #74796E to #60665C so body/placeholder text achieves >= 5.5:1 WCAG AA contrast on paper and white. */
+  --hub-muted-rgb: 96 102 92;
+  --hub-muted-subtle-rgb: 116 121 110;
+  --hub-paper-rgb: 248 248 243;
   --hub-surface-rgb: 255 255 255;
-  --hub-line-rgb: 225 225 218;
-  --hub-brand-rgb: 36 91 67;
-  --hub-brand-dark-rgb: 25 70 49;
-  --hub-brand-soft-rgb: 237 243 232;
-  --hub-lime-rgb: 216 237 145;
-  --hub-focus-inner-rgb: 216 237 145;
-  --hub-focus-outer-rgb: 36 91 67;
+  --hub-line-rgb: 228 230 220;
+  --hub-brand-rgb: 82 100 71;
+  --hub-brand-dark-rgb: 52 71 47;
+  --hub-brand-soft-rgb: 230 236 223;
+  --hub-lime-rgb: 230 236 223;
+
+  /* Category-specific muted editorial accents & accessible foreground inks */
+  --hub-sage-rgb: 230 236 223;
+  --hub-sage-ink-rgb: 52 71 47;
+  --hub-lavender-rgb: 235 232 243;
+  --hub-lavender-ink-rgb: 70 59 104;
+  --hub-peach-rgb: 245 232 219;
+  --hub-peach-ink-rgb: 106 67 38;
+  --hub-blue-gray-rgb: 230 237 240;
+  --hub-blue-gray-ink-rgb: 44 76 91;
+
+  --hub-focus-inner-rgb: 215 230 185;
+  --hub-focus-outer-rgb: 52 71 47;
 
   --hub-ink: rgb(var(--hub-ink-rgb));
   --hub-muted: rgb(var(--hub-muted-rgb));
+  --hub-muted-subtle: rgb(var(--hub-muted-subtle-rgb));
   --hub-paper: rgb(var(--hub-paper-rgb));
   --hub-surface: rgb(var(--hub-surface-rgb));
   --hub-line: rgb(var(--hub-line-rgb));
@@ -21,39 +36,51 @@
   --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
   --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
   --hub-lime: rgb(var(--hub-lime-rgb));
+  --hub-sage: rgb(var(--hub-sage-rgb));
+  --hub-lavender: rgb(var(--hub-lavender-rgb));
+  --hub-peach: rgb(var(--hub-peach-rgb));
+  --hub-blue-gray: rgb(var(--hub-blue-gray-rgb));
+
+  /* Self-contained typography stacks — zero external font network requests (CSP 'self' safe) */
+  --hub-font-sans: "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --hub-font-serif: "Playfair Display", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, Cambria, "Times New Roman", Times, serif;
+  --hub-font-mono: "DM Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --hub-gutter: clamp(0.75rem, 3vw, 2rem);
   --hub-radius-control: 0.875rem;
   --hub-radius-card: 1.5rem;
   --hub-radius-panel: 2rem;
-  --hub-type-display: clamp(2rem, 5.2vw, 4.25rem);
+  --hub-type-display: clamp(2.15rem, 5.1vw, 4.15rem);
   --hub-type-section: clamp(1.75rem, 3vw, 2.5rem);
   --hub-type-page: clamp(1.85rem, 5vw, 3.25rem);
 
-  --hub-motion-fast: 150ms;
-  --hub-motion-standard: 250ms;
-  --hub-motion-reveal: 400ms;
+  --hub-motion-fast: 160ms;
+  --hub-motion-standard: 260ms;
+  --hub-motion-reveal: 380ms;
   --hub-ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
   --hub-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
-  --hub-shadow-soft: 0 16px 44px rgb(23 25 20 / 7%);
-  --hub-shadow-lift: 0 22px 48px rgb(23 25 20 / 12%);
+  --hub-shadow-soft: 0 12px 34px -8px rgb(32 37 30 / 6%), 0 2px 8px rgb(32 37 30 / 3%);
+  --hub-shadow-lift: 0 20px 44px -10px rgb(32 37 30 / 11%), 0 4px 12px rgb(32 37 30 / 4%);
+  --hub-shadow-panel: 0 24px 56px -14px rgb(32 37 30 / 9%), 0 2px 10px rgb(32 37 30 / 3%);
 }
 
 [data-theme="dark"] {
-  --hub-ink-rgb: 237 244 232;
-  --hub-muted-rgb: 160 176 159;
-  --hub-paper-rgb: 16 26 20;
-  --hub-surface-rgb: 24 37 28;
-  --hub-line-rgb: 48 65 52;
-  --hub-brand-rgb: 184 223 131;
-  --hub-brand-dark-rgb: 203 237 158;
-  --hub-brand-soft-rgb: 41 59 46;
-  --hub-lime-rgb: 217 242 122;
-  --hub-focus-inner-rgb: 217 242 122;
-  --hub-focus-outer-rgb: 184 223 131;
+  --hub-ink-rgb: 238 242 233;
+  --hub-muted-rgb: 166 176 161;
+  --hub-muted-subtle-rgb: 140 150 135;
+  --hub-paper-rgb: 19 24 19;
+  --hub-surface-rgb: 27 34 27;
+  --hub-line-rgb: 51 62 50;
+  --hub-brand-rgb: 178 205 156;
+  --hub-brand-dark-rgb: 204 226 186;
+  --hub-brand-soft-rgb: 40 52 39;
+  --hub-lime-rgb: 212 228 176;
+  --hub-focus-inner-rgb: 212 228 176;
+  --hub-focus-outer-rgb: 178 205 156;
 
   --hub-ink: rgb(var(--hub-ink-rgb));
   --hub-muted: rgb(var(--hub-muted-rgb));
+  --hub-muted-subtle: rgb(var(--hub-muted-subtle-rgb));
   --hub-paper: rgb(var(--hub-paper-rgb));
   --hub-surface: rgb(var(--hub-surface-rgb));
   --hub-line: rgb(var(--hub-line-rgb));
@@ -62,6 +89,7 @@
   --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
   --hub-lime: rgb(var(--hub-lime-rgb));
 
-  --hub-shadow-soft: 0 16px 44px rgb(0 0 0 / 18%);
-  --hub-shadow-lift: 0 22px 48px rgb(0 0 0 / 28%);
+  --hub-shadow-soft: 0 16px 40px rgb(0 0 0 / 22%);
+  --hub-shadow-lift: 0 22px 48px rgb(0 0 0 / 32%);
+  --hub-shadow-panel: 0 26px 56px rgb(0 0 0 / 34%);
 }

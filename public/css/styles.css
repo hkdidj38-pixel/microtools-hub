@@ -43,10 +43,10 @@ body {
     margin: 0;
     overflow-wrap: anywhere;
     background:
-        radial-gradient(circle at 92% 4%, rgba(216, 237, 145, 0.14), transparent 26rem),
+        radial-gradient(circle at 92% 4%, rgba(82, 100, 71, 0.08), transparent 26rem),
         var(--bg-color);
     color: var(--text-color);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--hub-font-sans, "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
     line-height: 1.55;
     transition: background-color var(--hub-motion-standard) var(--hub-ease-standard), color var(--hub-motion-standard) var(--hub-ease-standard);
 }
@@ -120,6 +120,12 @@ nav {
     content: "✳";
     font-size: 1.2rem;
     line-height: 1;
+}
+
+[data-theme="dark"] .logo::before {
+    border: 1px solid var(--border-color);
+    background: var(--toggle-hover);
+    color: var(--primary-color);
 }
 
 .nav-links {

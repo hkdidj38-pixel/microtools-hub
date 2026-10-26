@@ -119,6 +119,27 @@ function contrastRatio(foreground, background) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
+async function waitForRevealOpacity(page, { id, state, threshold, description }) {
+  const className = state === 'pending' ? 'hub-reveal-pending' : 'hub-revealed';
+  try {
+    await page.waitForFunction(({ elementId, expectedClass, expectedState, opacityThreshold }) => {
+      const element = document.getElementById(elementId);
+      if (!element?.classList.contains(expectedClass)) return false;
+      const opacity = Number.parseFloat(getComputedStyle(element).opacity);
+      return expectedState === 'pending' ? opacity < opacityThreshold : opacity > opacityThreshold;
+    }, { elementId: id, expectedClass: className, expectedState: state, opacityThreshold: threshold }, { timeout: 5_000 });
+  } catch (cause) {
+    const observed = await page.evaluate((elementId) => {
+      const element = document.getElementById(elementId);
+      return element ? {
+        classes: [...element.classList],
+        opacity: Number.parseFloat(getComputedStyle(element).opacity),
+      } : { classes: [], opacity: null };
+    }, id).catch(() => ({ classes: [], opacity: null }));
+    throw new Error(`Timed out waiting for ${description}; observed ${JSON.stringify(observed)}.`, { cause });
+  }
+}
+
 try {
   fs.mkdirSync(screenshotRoot, { recursive: true });
   const chromiumPackage = path.join(root, 'node_modules/@sparticuz/chromium/bin/al2023.tar.br');
@@ -159,6 +180,48 @@ try {
     }
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  // Missing reveal targets must report the assertion failure without a second locator wait.
+  const revealDiagnosticPage = await context.newPage();
+  const diagnosticStarted = performance.now();
+  await assert.rejects(waitForRevealOpacity(revealDiagnosticPage, {
+    id: 'classic-tools',
+    state: 'pending',
+    threshold: 0.05,
+    description: 'a missing reveal target',
+  }), (error) => {
+    assert.equal(error.message, 'Timed out waiting for a missing reveal target; observed {"classes":[],"opacity":null}.');
+    assert.equal(error.cause?.name, 'TimeoutError', 'Reveal diagnostics should preserve the original assertion timeout.');
+    return true;
+  });
+  const diagnosticElapsed = performance.now() - diagnosticStarted;
+  assert.ok(diagnosticElapsed < 10_000, `Missing-target diagnostics should finish within 10 seconds, took ${Math.round(diagnosticElapsed)}ms.`);
+  await revealDiagnosticPage.close();
+  console.log(`[ui] missing reveal target reports diagnostics in ${Math.round(diagnosticElapsed)}ms without an additional locator wait`);
+
+  // Confirm prerendered tool content is styled and readable even before client hydration.
+  const prerenderContext = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 1440, height: 980 },
+  });
+  const prerenderPage = await prerenderContext.newPage();
+  const prerenderResponse = await prerenderPage.goto(`${baseURL}/tools/pdf-merger/`, { waitUntil: 'networkidle' });
+  assert.equal(prerenderResponse?.status(), 200, 'The prerendered tool route should load without JavaScript.');
+  assert.match(await prerenderPage.locator('main').innerText(), /Combine multiple PDF files into one document/);
+  const prerenderStyles = await prerenderPage.locator('main.mx-auto').evaluate((main) => {
+    const heading = main.querySelector('h1');
+    return {
+      maxWidth: getComputedStyle(main).maxWidth,
+      marginLeft: getComputedStyle(main).marginLeft,
+      paddingTop: getComputedStyle(main).paddingTop,
+      headingFontSize: heading ? getComputedStyle(heading).fontSize : '',
+    };
+  });
+  assert.equal(prerenderStyles.maxWidth, '1152px', 'Prerendered content should receive its max-width utility before hydration.');
+  assert.equal(prerenderStyles.marginLeft, '144px', 'Prerendered content should be centered before hydration.');
+  assert.equal(prerenderStyles.paddingTop, '40px', 'Responsive prerender spacing should apply before hydration.');
+  assert.equal(prerenderStyles.headingFontSize, '36px', 'Responsive heading styles should apply before hydration.');
+  console.log('[ui] prerendered tool content and responsive Tailwind styles render without JavaScript');
 
   // Browse the actual production build at all requested sizes and at two wider desktop widths.
   for (const width of viewports) {
@@ -212,13 +275,20 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
   const classicSection = page.locator('#classic-tools');
-  await page.waitForFunction(() => document.getElementById('classic-tools')?.classList.contains('hub-reveal-pending'));
-  assert.ok(Number.parseFloat(await classicSection.evaluate((element) => getComputedStyle(element).opacity)) < 0.05, 'A below-fold section should begin in its pending reveal state.');
+  await waitForRevealOpacity(page, {
+    id: 'classic-tools',
+    state: 'pending',
+    threshold: 0.05,
+    description: 'the below-fold section to settle into its pending opacity',
+  });
+  assert.ok(Number.parseFloat(await classicSection.evaluate((element) => getComputedStyle(element).opacity)) < 0.05, 'A below-fold section should begin in its settled pending reveal state.');
   await classicSection.scrollIntoViewIfNeeded();
-  await page.waitForFunction(() => {
-    const element = document.getElementById('classic-tools');
-    return element?.classList.contains('hub-revealed') && Number.parseFloat(getComputedStyle(element).opacity) > 0.99;
-  }, null, { timeout: 5_000 });
+  await waitForRevealOpacity(page, {
+    id: 'classic-tools',
+    state: 'revealed',
+    threshold: 0.99,
+    description: 'the section to settle into its revealed opacity after scrolling',
+  });
   await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
   const menuButton = page.locator('[data-site-menu-toggle="true"]');
   await menuButton.focus();
@@ -255,10 +325,23 @@ try {
       const classicLink = page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Classic utilities' });
       await classicLink.focus();
       await classicLink.press('Enter');
-      await page.waitForFunction(() => {
-        const top = document.getElementById('classic-tools')?.getBoundingClientRect().top ?? Infinity;
-        return window.location.hash === '#classic-tools' && document.activeElement?.id === 'classic-tools' && top >= 0 && top < 200;
-      });
+      try {
+        await page.waitForFunction(() => {
+          const top = document.getElementById('classic-tools')?.getBoundingClientRect().top ?? Infinity;
+          return window.location.hash === '#classic-tools' && document.activeElement?.id === 'classic-tools' && top >= 0 && top < 200;
+        }, null, { timeout: 5_000 });
+      } catch (cause) {
+        const observed = await page.evaluate(() => {
+          const target = document.getElementById('classic-tools');
+          return {
+            hash: window.location.hash,
+            activeElement: document.activeElement?.outerHTML.slice(0, 160) ?? null,
+            targetTop: target?.getBoundingClientRect().top ?? null,
+            scrollY: window.scrollY,
+          };
+        });
+        throw new Error(`Keyboard section navigation failed on ${route} (repeat ${repeat + 1}): ${JSON.stringify(observed)}.`, { cause });
+      }
       assert.equal(await menuButton.getAttribute('aria-expanded'), 'false', 'Navigation should close the mobile disclosure.');
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('href')), '/word-counter/', 'Tab after section navigation should reach the first destination link.');
@@ -345,12 +428,37 @@ try {
   const viewTransitionCalls = await page.evaluate(() => window.__hubViewTransitionCalls);
   if (nativeViewTransitions) assert.ok(viewTransitionCalls > 0, 'Local category changes should use native View Transitions when supported.');
   await page.getByRole('button', { name: /All tools/ }).click();
+  await page.keyboard.press('ArrowRight');
+  assert.match(await page.evaluate(() => document.activeElement?.textContent ?? ''), /Developer/, 'ArrowRight should move focus to the next category filter chip.');
+  await page.locator('body').click({ position: { x: 12, y: 12 } });
+  await page.keyboard.press('/');
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'tool-search', 'Pressing / outside inputs should focus the tool search field.');
+  await page.keyboard.type('pdf');
+  assert.equal(await page.locator('#tool-search').inputValue(), 'pdf');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#tool-search').inputValue(), '', 'Escape should clear a populated search query.');
   await page.locator('#tool-search').fill('no matching tool');
   await page.getByRole('heading', { name: 'Nothing in this search.' }).waitFor();
   await page.getByRole('button', { name: 'Show every tool' }).click();
   await page.waitForFunction(() => document.querySelectorAll('#toolbox a[href^="/tools/"]').length === 4, null, { timeout: 5_000 });
   assert.equal(await page.locator('#toolbox a[href^="/tools/"]').count(), 4);
-  console.log(`[ui] registry discovery and controls verified; placeholder ${placeholderContrast.toFixed(2)}:1, light focus ring ${lightFocusContrast.toFixed(2)}:1`);
+  assert.match(await page.locator('#privacy').innerText(), /Your files are your business\./, 'Privacy section should render the editorial headline.');
+  assert.match(await page.locator('#privacy').innerText(), /Disclosed edge path for URL inspection/i, 'Privacy section must disclose the edge-assisted URL inspector.');
+
+  // Verify the initial homepage load does not eagerly fetch heavy tool chunks, workers, or FFmpeg WASM.
+  const lazyCheckPage = await context.newPage();
+  const homeAssetPaths = [];
+  lazyCheckPage.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.origin === baseURL) homeAssetPaths.push(url.pathname);
+  });
+  await lazyCheckPage.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  const eagerHeavyAssets = homeAssetPaths.filter((pathname) => (
+    /ffmpeg-core|\/part-\d+|image-compress\.worker|pdf-merger\.worker|png-quantize\.worker/i.test(pathname)
+  ));
+  assert.deepEqual(eagerHeavyAssets, [], `Homepage must not eagerly load heavy tool engines or workers: ${eagerHeavyAssets.join(', ')}`);
+  await lazyCheckPage.close();
+  console.log(`[ui] registry discovery, keyboard shortcuts, lazy-loading guard, and controls verified; placeholder ${placeholderContrast.toFixed(2)}:1, light focus ring ${lightFocusContrast.toFixed(2)}:1`);
 
   // Real image compression in the browser worker and a real ZIP download.
   await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });
