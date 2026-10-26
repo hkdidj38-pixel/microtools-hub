@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, ShieldCheck, Sparkles, X } from 'lucide-react';
 import type { ToolMeta } from '@/lib/registry';
+import { focusFragmentTarget } from '@/lib/navigation';
 
 interface SiteHeaderProps {
   variant: 'home' | 'tool';
@@ -13,8 +14,6 @@ const sectionLinks = [
   { label: 'Classic utilities', id: 'classic-tools' },
   { label: 'Privacy & data', id: 'privacy' },
 ] as const;
-
-const menuButtonSelector = '[data-site-menu-toggle="true"]';
 
 export function SiteHeader({ variant, privacy }: SiteHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -31,7 +30,7 @@ export function SiteHeader({ variant, privacy }: SiteHeaderProps) {
     setIsMenuOpen(false);
     if (restoreFocus) {
       window.requestAnimationFrame(() => {
-        document.querySelector<HTMLButtonElement>(menuButtonSelector)?.focus();
+        menuButtonRef.current?.focus();
       });
     }
   };
@@ -94,7 +93,15 @@ export function SiteHeader({ variant, privacy }: SiteHeaderProps) {
           {sectionLinks.map((item) => renderSectionLink(
             item,
             'flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-ink transition-colors duration-fast ease-standard hover:bg-brand-soft hover:text-brand active:bg-paper',
-            () => closeMenu(true),
+            () => {
+              closeMenu();
+              if (isHome) {
+                window.requestAnimationFrame(() => {
+                  const target = document.getElementById(item.id);
+                  if (target) focusFragmentTarget(target);
+                });
+              }
+            },
           ))}
         </nav>
       </div>

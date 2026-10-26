@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { AlertCircle, CheckCircle2, Download, FileAudio, FileVideo, LoaderCircle, ShieldCheck, Video, X } from 'lucide-react';
-import { runWithViewTransition } from '@/lib/motion';
 import { MediaConverterEngine } from './engine';
 import { FFMPEG_CORE_URL, FFMPEG_WASM_MANIFEST_URL } from './ffmpegAssets';
 import type { WasmDownloadProgress } from './wasmLoader';
@@ -209,7 +208,7 @@ export default function MediaConverterTool() {
       return;
     }
     const droppedFile = event.dataTransfer.files.item(0);
-    if (droppedFile) runWithViewTransition(() => selectFile(droppedFile));
+    if (droppedFile) selectFile(droppedFile);
   };
 
   return (
@@ -231,7 +230,7 @@ export default function MediaConverterTool() {
       <section aria-labelledby="media-file-heading">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="media-file-heading" className="text-sm font-bold text-ink">1. Select one media file</h2>
-          {file && !isBusy && <button type="button" onClick={() => runWithViewTransition(clearAll)} className="hub-button-secondary min-h-9 px-3 py-2 text-xs">Clear</button>}
+          {file && !isBusy && <button type="button" onClick={clearAll} className="hub-button-secondary min-h-9 px-3 py-2 text-xs">Clear</button>}
         </div>
         <label
           htmlFor="media-file"
@@ -266,7 +265,7 @@ export default function MediaConverterTool() {
             disabled={isBusy}
             onChange={(event) => {
               const selectedFile = event.target.files?.item(0) ?? null;
-              if (selectedFile) runWithViewTransition(() => selectFile(selectedFile));
+              if (selectedFile) selectFile(selectedFile);
               event.currentTarget.value = '';
             }}
             className="sr-only"
@@ -295,7 +294,7 @@ export default function MediaConverterTool() {
                 disabled={isBusy}
                 onChange={(event) => {
                   const nextOperation = event.currentTarget.value as MediaOperation;
-                  runWithViewTransition(() => handleOperationChange(nextOperation));
+                  handleOperationChange(nextOperation);
                 }}
                 className="hub-input min-h-11 py-2.5"
               >

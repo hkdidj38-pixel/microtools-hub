@@ -22,6 +22,7 @@ import { SiteHeader } from '@/components/SiteHeader';
 import { ToolLayout } from '@/components/ToolLayout';
 import { runWithViewTransition } from '@/lib/motion';
 import { useScrollReveal } from '@/lib/useScrollReveal';
+import { focusFragmentTarget } from '@/lib/navigation';
 
 const legacyTools = [
   { name: 'Word Counter', slug: 'word-counter', description: 'Count words, characters, sentences, and reading time.', icon: Type },
@@ -38,7 +39,7 @@ const toolIcons: Record<string, LucideIcon> = {
 };
 
 function ScrollToHash() {
-  const { pathname, hash } = useLocation();
+  const { pathname, hash, key } = useLocation();
 
   useEffect(() => {
     if (!hash || hash === '#') return;
@@ -49,8 +50,11 @@ function ScrollToHash() {
       // A malformed fragment must not prevent the page from rendering.
       return;
     }
-    document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
-  }, [pathname, hash]);
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    focusFragmentTarget(target);
+    target.scrollIntoView({ block: 'start' });
+  }, [pathname, hash, key]);
 
   return null;
 }
