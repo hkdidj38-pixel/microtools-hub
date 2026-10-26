@@ -17,8 +17,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { BrowserRouter, Link, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { TOOLS_REGISTRY } from '@/lib/registry';
+import { TOOLS_REGISTRY, type RegisteredTool } from '@/lib/registry';
+import { SiteHeader } from '@/components/SiteHeader';
 import { ToolLayout } from '@/components/ToolLayout';
+import { runWithViewTransition } from '@/lib/motion';
+import { useScrollReveal } from '@/lib/useScrollReveal';
+import { focusFragmentTarget } from '@/lib/navigation';
 
 const legacyTools = [
   { name: 'Word Counter', slug: 'word-counter', description: 'Count words, characters, sentences, and reading time.', icon: Type },
@@ -35,7 +39,7 @@ const toolIcons: Record<string, LucideIcon> = {
 };
 
 function ScrollToHash() {
-  const { pathname, hash } = useLocation();
+  const { pathname, hash, key } = useLocation();
 
   useEffect(() => {
     if (!hash || hash === '#') return;
@@ -46,15 +50,48 @@ function ScrollToHash() {
       // A malformed fragment must not prevent the page from rendering.
       return;
     }
-    document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
-  }, [pathname, hash]);
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    focusFragmentTarget(target);
+    target.scrollIntoView({ block: 'start' });
+  }, [pathname, hash, key]);
 
   return null;
+}
+
+function ToolCard({ tool, index }: { tool: RegisteredTool; index: number }) {
+  const Icon = toolIcons[tool.slug] ?? Sparkles;
+  const delay = Math.min(index * 50, 150);
+
+  return (
+    <Link
+      to={`/tools/${tool.slug}`}
+      className="group flex min-w-0 flex-col rounded-hub-card border border-line bg-white p-4 shadow-sm transition duration-standard ease-standard hover:-translate-y-0.5 hover:border-brand/25 hover:shadow-lift active:translate-y-0 focus-visible:shadow-lift motion-safe:animate-hub-card-enter sm:min-h-[16rem] sm:p-6"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand transition-colors duration-standard ease-standard group-hover:bg-lime group-hover:text-ink">
+          <Icon className="h-5 w-5 transition-transform duration-standard ease-standard group-hover:-rotate-3 group-hover:scale-105" aria-hidden="true" />
+        </span>
+        <span className="rounded-full bg-paper px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">{tool.category}</span>
+      </div>
+      <div className="mt-4 min-w-0 flex-1 sm:mt-6">
+        <h3 className="break-words text-lg font-extrabold tracking-tight text-ink transition-colors duration-fast group-hover:text-brand">{tool.name}</h3>
+        <p className="mt-2 text-sm leading-6 text-muted">{tool.description}</p>
+      </div>
+      <span className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand sm:mt-5">
+        Open tool <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-standard ease-standard group-hover:translate-x-1" aria-hidden="true" />
+      </span>
+    </Link>
+  );
 }
 
 function HomePage() {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All tools');
+  const toolboxRevealRef = useScrollReveal<HTMLElement>();
+  const classicRevealRef = useScrollReveal<HTMLElement>();
+  const privacyRevealRef = useScrollReveal<HTMLElement>();
   const categories = useMemo(
     () => ['All tools', ...Array.from(new Set(TOOLS_REGISTRY.map((tool) => tool.category))).sort((a, b) => a.localeCompare(b))],
     [],
@@ -67,30 +104,17 @@ function HomePage() {
     return matchesCategory && matchesQuery;
   }), [normalizedQuery, selectedCategory]);
   const categoryCount = categories.length - 1;
+  const clearFilters = () => runWithViewTransition(() => {
+    setQuery('');
+    setSelectedCategory('All tools');
+  });
 
   return (
     <div className="min-h-screen bg-paper text-ink">
       <a href="#main-content" className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
-        <nav className="hub-container flex h-16 items-center justify-between gap-2 sm:h-[4.5rem] sm:gap-5" aria-label="Main navigation">
-          <Link to="/" className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-xl sm:gap-3" aria-label="MicroTools Hub home">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6 sm:h-10 sm:w-10 sm:rounded-2xl">
-              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
-          </Link>
-          <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-6">
-            <a href="#toolbox" className="hidden text-sm font-semibold text-muted transition hover:text-brand sm:inline-flex">Explore tools</a>
-            <a href="#classic-tools" className="hidden text-sm font-semibold text-muted transition hover:text-brand md:inline-flex">Classic utilities</a>
-            <a href="#privacy" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 text-[11px] font-bold text-ink transition hover:border-brand/30 hover:text-brand sm:min-h-10 sm:gap-2 sm:px-4 sm:text-sm">
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand sm:h-4 sm:w-4" aria-hidden="true" />
-              <span>Privacy first</span>
-            </a>
-          </div>
-        </nav>
-      </header>
+      <SiteHeader variant="home" privacy={TOOLS_REGISTRY.find((tool) => tool.slug === 'url-screenshot')?.privacy} />
 
       <main id="main-content">
         <section className="relative isolate overflow-hidden bg-ink text-white">
@@ -103,34 +127,35 @@ function HomePage() {
                 <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_14px_rgba(216,237,145,.7)]" />
                 A considered little workbench
               </div>
-              <h1 className="max-w-full text-[clamp(1.8rem,8.2vw,3.2rem)] font-black leading-[1.04] tracking-[-0.045em] [overflow-wrap:anywhere] sm:text-5xl lg:text-6xl">
-                Make small work<br /><span className="text-lime">feel effortless.</span>
+              <h1 className="max-w-full text-[clamp(1.8rem,8.2vw,3.2rem)] font-black leading-[1.04] tracking-[-0.045em] [overflow-wrap:anywhere] motion-safe:animate-hub-enter sm:text-5xl lg:text-6xl" style={{ animationDelay: '50ms' }}>
+                Make small work<br /><span className="font-serif font-medium italic text-lime">feel effortless.</span>
               </h1>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-white/70 sm:mt-5 sm:text-lg sm:leading-8">
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/70 motion-safe:animate-hub-enter sm:mt-5 sm:text-lg sm:leading-8" style={{ animationDelay: '110ms' }}>
                 Image, PDF, media, metadata, and writing tools—easy to reach and clear about how they handle your data.
               </p>
-              <div className="mt-6 max-w-xl sm:mt-8">
+              <div className="mt-6 max-w-xl motion-safe:animate-hub-enter sm:mt-8" style={{ animationDelay: '170ms' }}>
                 <label htmlFor="tool-search" className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-white/65">Find a tool</label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand" aria-hidden="true" />
-                  {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-xl text-muted hover:bg-paper hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /></button>}
+                  {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-xl text-muted transition-colors duration-fast hover:bg-paper hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /></button>}
                   <input
                     id="tool-search"
                     type="search"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search image, PDF, media…"
-                    className="hub-input min-h-12 rounded-2xl border-white/70 bg-white pl-12 pr-12 text-sm shadow-lg shadow-black/10 sm:min-h-14"
+                    aria-controls="tool-search-results"
+                    className="hub-input min-h-12 rounded-2xl border-white/70 bg-white pl-12 pr-12 text-sm shadow-lg shadow-black/10 transition-[border-color,box-shadow] focus-visible:shadow-xl sm:min-h-14"
                   />
                 </div>
               </div>
-              <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-white/55 sm:mt-5">
+              <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-white/55 motion-safe:animate-hub-enter sm:mt-5" style={{ animationDelay: '230ms' }}>
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden="true" />
                 <span>Image, PDF, media, and text work stays in your browser. URL inspection sends the submitted URL through a disclosed edge path.</span>
               </p>
             </div>
 
-            <aside className="relative mx-auto w-full min-w-0 max-w-md lg:ml-auto" aria-label="Toolbox overview">
+            <aside className="relative mx-auto w-full min-w-0 max-w-md motion-safe:animate-hub-enter lg:ml-auto" style={{ animationDelay: '170ms' }} aria-label="Toolbox overview">
               <div className="absolute -inset-4 rounded-[2.5rem] bg-white/[0.04] blur-xl" aria-hidden="true" />
               <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.07] p-4 shadow-2xl backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
                 <div className="flex items-start justify-between gap-3 sm:gap-4">
@@ -170,7 +195,7 @@ function HomePage() {
           </div>
         </section>
 
-        <section id="toolbox" className="hub-container min-w-0 scroll-mt-20 py-10 sm:scroll-mt-24 sm:py-20">
+        <section ref={toolboxRevealRef} id="toolbox" className="hub-scroll-reveal hub-container min-w-0 scroll-mt-20 py-10 sm:scroll-mt-24 sm:py-20">
           <div className="flex min-w-0 flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 max-w-2xl">
               <p className="hub-eyebrow">The toolkit</p>
@@ -193,8 +218,10 @@ function HomePage() {
                   key={category}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition sm:gap-2 sm:px-4 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
+                  onClick={() => {
+                    if (!active) runWithViewTransition(() => setSelectedCategory(category));
+                  }}
+                  className={`hub-filter-chip inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition-colors duration-fast ease-standard sm:gap-2 sm:px-4 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
                 >
                   {category}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/15 text-lime' : 'bg-paper text-muted'}`}>{count}</span>
                 </button>
@@ -204,39 +231,26 @@ function HomePage() {
 
           <div className="mb-4 mt-8 flex items-center justify-between gap-4">
             <p className="text-sm font-bold text-ink" aria-live="polite">{filteredTools.length} {filteredTools.length === 1 ? 'tool' : 'tools'} to explore</p>
-            {(query || selectedCategory !== 'All tools') && <button type="button" onClick={() => { setQuery(''); setSelectedCategory('All tools'); }} className="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand">Clear filters</button>}
+            {(query || selectedCategory !== 'All tools') && <button type="button" onClick={clearFilters} className="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand">Clear filters</button>}
           </div>
 
-          {filteredTools.length ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {filteredTools.map((tool) => {
-                const Icon = toolIcons[tool.slug] ?? Sparkles;
-                return (
-                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-w-0 flex-col rounded-3xl border border-line bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift sm:min-h-[16rem] sm:rounded-[1.75rem] sm:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand transition group-hover:bg-lime group-hover:text-ink"><Icon className="h-5 w-5" aria-hidden="true" /></span>
-                      <span className="rounded-full bg-paper px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">{tool.category}</span>
-                    </div>
-                    <div className="mt-4 min-w-0 flex-1 sm:mt-6">
-                      <h3 className="break-words text-lg font-extrabold tracking-tight text-ink group-hover:text-brand">{tool.name}</h3>
-                      <p className="mt-2 text-sm leading-6 text-muted">{tool.description}</p>
-                    </div>
-                    <span className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand sm:mt-5">Open tool <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-3xl border border-dashed border-line bg-white px-6 py-14 text-center">
-              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><Search className="h-5 w-5" aria-hidden="true" /></span>
-              <h3 className="mt-4 text-lg font-extrabold text-ink">Nothing in this search.</h3>
-              <p className="mt-1 text-sm text-muted">Try a different phrase or reset your filters.</p>
-              <button type="button" onClick={() => { setQuery(''); setSelectedCategory('All tools'); }} className="hub-button-secondary mt-5">Show every tool</button>
-            </div>
-          )}
+          <div id="tool-search-results" className="min-w-0">
+            {filteredTools.length ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {filteredTools.map((tool, index) => <ToolCard key={tool.slug} tool={tool} index={index} />)}
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-dashed border-line bg-white px-6 py-14 text-center motion-safe:animate-hub-enter">
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><Search className="h-5 w-5" aria-hidden="true" /></span>
+                <h3 className="mt-4 text-lg font-extrabold text-ink">Nothing in this search.</h3>
+                <p className="mt-1 text-sm text-muted">Try a different phrase or reset your filters.</p>
+                <button type="button" onClick={clearFilters} className="hub-button-secondary mt-5">Show every tool</button>
+              </div>
+            )}
+          </div>
         </section>
 
-        <section id="classic-tools" className="hub-container min-w-0 scroll-mt-20 pb-10 sm:scroll-mt-24 sm:pb-20">
+        <section ref={classicRevealRef} id="classic-tools" className="hub-scroll-reveal hub-container min-w-0 scroll-mt-20 pb-10 sm:scroll-mt-24 sm:pb-20">
           <div className="min-w-0 rounded-3xl border border-line bg-white p-4 shadow-soft sm:rounded-[2rem] sm:p-8">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
@@ -258,7 +272,7 @@ function HomePage() {
           </div>
         </section>
 
-        <section id="privacy" className="hub-container min-w-0 scroll-mt-20 pb-12 sm:scroll-mt-24 sm:pb-20">
+        <section ref={privacyRevealRef} id="privacy" className="hub-scroll-reveal hub-container min-w-0 scroll-mt-20 pb-12 sm:scroll-mt-24 sm:pb-20">
           <div className="grid min-w-0 gap-4 rounded-3xl bg-brand-soft p-4 sm:gap-5 sm:rounded-[2rem] sm:p-8 lg:grid-cols-[auto_1fr] lg:items-start">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
             <div>

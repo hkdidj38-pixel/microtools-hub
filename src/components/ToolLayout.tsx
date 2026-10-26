@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, HelpCircle, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, HelpCircle, ShieldCheck } from 'lucide-react';
+import { SiteHeader } from '@/components/SiteHeader';
+import { useScrollReveal } from '@/lib/useScrollReveal';
 import type { ToolMeta } from '@/lib/registry';
 
 interface ToolLayoutProps {
@@ -10,6 +12,7 @@ interface ToolLayoutProps {
 
 export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
   const isEdgeTool = meta.privacy.mode === 'edge';
+  const faqRevealRef = useScrollReveal<HTMLElement>();
 
   useEffect(() => {
     document.title = `${meta.name} — MicroTools Hub`;
@@ -23,23 +26,7 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
       <a href="#tool-main" className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
         Skip to tool
       </a>
-      <header className="sticky top-0 z-30 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
-        <nav className="hub-container flex h-16 items-center justify-between gap-2 sm:h-[4.5rem] sm:gap-4" aria-label="Main navigation">
-          <Link className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-xl sm:gap-3" to="/" aria-label="MicroTools Hub home">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6 sm:h-10 sm:w-10 sm:rounded-2xl">
-              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
-          </Link>
-          <div className="flex min-w-0 items-center gap-2 sm:gap-5">
-            <Link to="/#toolbox" className="hidden text-sm font-semibold text-muted transition hover:text-brand sm:inline-flex">Browse tools</Link>
-            <span className={`inline-flex min-h-9 max-w-[53vw] items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold leading-tight sm:max-w-none sm:gap-2 sm:px-3.5 sm:py-2 sm:text-xs ${isEdgeTool ? 'border-amber-200 bg-amber-50 text-amber-950' : 'border-brand/15 bg-brand-soft text-brand-dark'}`}>
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
-              <span className="min-w-0">{meta.privacy.label}</span>
-            </span>
-          </div>
-        </nav>
-      </header>
+      <SiteHeader variant="tool" privacy={meta.privacy} />
 
       <main id="tool-main" className="hub-container min-w-0 w-full flex-1 py-5 sm:py-10 lg:py-12">
         <div className="mx-auto min-w-0 max-w-5xl">
@@ -51,7 +38,7 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
             <span aria-current="page" className="min-w-0 break-words text-ink">{meta.name}</span>
           </nav>
 
-          <div className="mb-5 grid min-w-0 gap-4 sm:mb-7 sm:gap-5 md:grid-cols-[1fr_auto] md:items-end">
+          <div className="mb-5 grid min-w-0 gap-4 motion-safe:animate-hub-enter sm:mb-7 sm:gap-5 md:grid-cols-[1fr_auto] md:items-end">
             <div className="min-w-0 max-w-3xl">
               <p className="hub-eyebrow">{meta.category} toolkit</p>
               <h1 className="mt-2 break-words text-[clamp(1.7rem,7.5vw,3.1rem)] font-black leading-[1.08] tracking-[-0.045em] text-ink sm:mt-3 sm:text-4xl lg:text-5xl">{meta.name}</h1>
@@ -62,7 +49,7 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
             </Link>
           </div>
 
-          <aside className={`mb-4 flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 sm:mb-5 sm:px-5 ${isEdgeTool ? 'border-amber-200 bg-amber-50/80 text-amber-950' : 'border-brand/15 bg-brand-soft/70 text-brand-dark'}`} aria-label="How this tool handles your data">
+          <aside className={`mb-4 flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 motion-safe:animate-hub-enter sm:mb-5 sm:px-5 ${isEdgeTool ? 'border-amber-200 bg-amber-50/80 text-amber-950' : 'border-brand/15 bg-brand-soft/70 text-brand-dark'}`} style={{ animationDelay: '70ms' }} aria-label="How this tool handles your data">
             <ShieldCheck className={`mt-0.5 h-4 w-4 shrink-0 ${isEdgeTool ? 'text-amber-800' : 'text-brand'}`} aria-hidden="true" />
             <div className="min-w-0">
               <p className="font-bold">{meta.privacy.label}</p>
@@ -70,12 +57,12 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
             </div>
           </aside>
 
-          <section className="min-w-0 rounded-3xl border border-line bg-white p-3 shadow-soft sm:rounded-[2rem] sm:p-5 lg:p-7" aria-label={`${meta.name} workspace`}>
+          <section className="min-w-0 rounded-3xl border border-line bg-white p-3 shadow-soft motion-safe:animate-hub-enter sm:rounded-[2rem] sm:p-5 lg:p-7" style={{ animationDelay: '120ms' }} aria-label={`${meta.name} workspace`}>
             {children}
           </section>
 
           {meta.faqs.length > 0 && (
-            <section className="mt-8 sm:mt-11" aria-labelledby="faq-heading">
+            <section ref={faqRevealRef} className="hub-scroll-reveal mt-8 sm:mt-11" aria-labelledby="faq-heading">
               <div className="mb-4 flex min-w-0 items-end justify-between gap-4 sm:mb-5">
                 <div className="min-w-0">
                   <p className="hub-eyebrow">Good to know</p>

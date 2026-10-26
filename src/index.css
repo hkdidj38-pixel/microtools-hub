@@ -64,15 +64,101 @@
   }
 
   .hub-input {
-    @apply w-full rounded-2xl border border-line bg-white px-4 py-3.5 text-sm text-ink shadow-sm placeholder:text-muted transition focus:border-brand;
+    @apply w-full rounded-hub-control border border-line bg-white px-4 py-3.5 text-sm text-ink shadow-sm placeholder:text-muted transition-colors duration-fast ease-standard focus:border-brand;
   }
 
   .hub-button-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-hub-control bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-fast ease-standard hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .hub-button-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-brand/30 hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors duration-fast ease-standard hover:border-brand/30 hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .hub-scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: opacity var(--hub-motion-reveal) var(--hub-ease-emphasized), transform var(--hub-motion-reveal) var(--hub-ease-emphasized);
+  }
+
+  .hub-scroll-reveal.hub-reveal-pending {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+
+  .hub-scroll-reveal.hub-revealed {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hub-scroll-reveal:focus-within {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hub-filter-chip {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .hub-filter-chip::after {
+    position: absolute;
+    right: 1rem;
+    bottom: 0.24rem;
+    left: 1rem;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--hub-lime);
+    content: "";
+    pointer-events: none;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform var(--hub-motion-standard) var(--hub-ease-emphasized);
+  }
+
+  .hub-filter-chip[aria-pressed="true"] {
+    view-transition-name: active-category-filter;
+  }
+
+  .hub-filter-chip[aria-pressed="true"]::after {
+    transform: scaleX(1);
+  }
+
+  #tool-search-results {
+    view-transition-name: tool-search-results;
+  }
+
+  .hub-file-list--pdf {
+    view-transition-name: pdf-file-list;
+  }
+
+  .hub-pdf-result {
+    view-transition-name: pdf-merge-result;
+  }
+
+  .hub-file-selection--media {
+    view-transition-name: media-file-selection;
+  }
+
+  .hub-results-panel--media {
+    view-transition-name: media-conversion-result;
+  }
+
+  .hub-results-panel--images {
+    view-transition-name: image-results-panel;
+  }
+
+  .hub-notification--notice {
+    view-transition-name: tool-notice;
+  }
+
+  .hub-notification--error {
+    view-transition-name: tool-error;
+  }
+
+  .hub-notification--page-limit {
+    view-transition-name: pdf-page-limit-notice;
   }
 }
 
@@ -88,7 +174,18 @@ summary:focus-visible,
   outline: 3px solid rgb(var(--hub-focus-inner-rgb));
   outline-offset: 2px;
   box-shadow: 0 0 0 7px rgb(var(--hub-focus-outer-rgb));
-  transition: none;
+  transition: outline-color var(--hub-motion-fast) var(--hub-ease-standard), box-shadow var(--hub-motion-fast) var(--hub-ease-standard);
+}
+
+::view-transition-group(*) {
+  animation-duration: var(--hub-motion-standard);
+  animation-timing-function: var(--hub-ease-emphasized);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--hub-motion-standard);
+  animation-timing-function: var(--hub-ease-emphasized);
 }
 
 @media (forced-colors: active) {
@@ -112,5 +209,31 @@ summary:focus-visible,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  .hub-scroll-reveal,
+  .hub-scroll-reveal.hub-reveal-pending,
+  .hub-scroll-reveal.hub-revealed {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .hub-dropzone[data-dragging="true"] {
+    transform: none !important;
+  }
+
+  .hub-filter-chip::after {
+    transition: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

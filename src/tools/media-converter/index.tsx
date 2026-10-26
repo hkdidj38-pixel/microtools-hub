@@ -46,6 +46,7 @@ export default function MediaConverterTool() {
   const engineRef = useRef<MediaConverterEngine | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
   const [operation, setOperation] = useState<MediaOperation>('video-convert');
   const [outputFormat, setOutputFormat] = useState<MediaFormat>('webm');
   const [quality, setQuality] = useState(DEFAULT_VIDEO_QUALITY);
@@ -57,6 +58,7 @@ export default function MediaConverterTool() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ConversionResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
   const activeJobIdRef = useRef<number | null>(null);
   const outputURLRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
@@ -197,13 +199,16 @@ export default function MediaConverterTool() {
 
   const onDrop = (event: React.DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragActive(false);
     if (isBusy) return;
     if (event.dataTransfer.files.length > 1) {
       setError('Choose or drop one file at a time.');
       setStatus('File selection not accepted.');
       return;
     }
-    selectFile(event.dataTransfer.files.item(0));
+    const droppedFile = event.dataTransfer.files.item(0);
+    if (droppedFile) selectFile(droppedFile);
   };
 
   return (
@@ -229,9 +234,21 @@ export default function MediaConverterTool() {
         </div>
         <label
           htmlFor="media-file"
+          data-dragging={isDragActive}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (isBusy) return;
+            dragDepthRef.current += 1;
+            setIsDragActive(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+            if (dragDepthRef.current === 0) setIsDragActive(false);
+          }}
           onDragOver={(event) => event.preventDefault()}
           onDrop={onDrop}
-          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition ${isBusy ? 'cursor-not-allowed border-line bg-paper/60 opacity-70' : 'border-brand/30 bg-brand-soft/40 hover:border-brand hover:bg-brand-soft/70'}`}
+          className={`hub-dropzone flex min-h-36 flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition-[border-color,background-color,box-shadow] duration-standard ease-standard ${isBusy ? 'cursor-not-allowed border-line bg-paper/60 opacity-70' : isDragActive ? 'cursor-pointer border-brand bg-brand-soft ring-2 ring-brand/20 shadow-soft' : 'cursor-pointer border-brand/30 bg-brand-soft/40 hover:border-brand hover:bg-brand-soft/70'}`}
         >
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm">
             {fileFormat && FORMAT_INFO[fileFormat].kind === 'audio'
@@ -247,7 +264,8 @@ export default function MediaConverterTool() {
             accept={ACCEPTED_TYPES}
             disabled={isBusy}
             onChange={(event) => {
-              selectFile(event.target.files?.item(0) ?? null);
+              const selectedFile = event.target.files?.item(0) ?? null;
+              if (selectedFile) selectFile(selectedFile);
               event.currentTarget.value = '';
             }}
             className="sr-only"
@@ -255,7 +273,7 @@ export default function MediaConverterTool() {
         </label>
 
         {file && fileFormat && (
-          <div className="mt-3 grid gap-2 rounded-2xl border border-line bg-paper/60 p-4 text-sm sm:grid-cols-2" aria-label="Selected file information">
+          <div className="hub-file-selection--media mt-3 grid gap-2 rounded-2xl border border-line bg-paper/60 p-4 text-sm motion-safe:animate-hub-enter sm:grid-cols-2" aria-label="Selected file information">
             <p className="min-w-0 break-words"><span className="font-semibold text-muted">File:</span> <span className="text-ink">{file.name}</span></p>
             <p><span className="font-semibold text-muted">Size:</span> <span className="text-ink">{formatBytes(file.size)}</span></p>
             <p><span className="font-semibold text-muted">Detected from extension:</span> <span className="uppercase text-ink">{fileFormat}</span></p>
@@ -274,7 +292,10 @@ export default function MediaConverterTool() {
                 id="media-operation"
                 value={operation}
                 disabled={isBusy}
-                onChange={(event) => handleOperationChange(event.target.value as MediaOperation)}
+                onChange={(event) => {
+                  const nextOperation = event.currentTarget.value as MediaOperation;
+                  handleOperationChange(nextOperation);
+                }}
                 className="hub-input min-h-11 py-2.5"
               >
                 {supportedOperations.map((item) => <option key={item} value={item}>{operationLabels[item]}</option>)}
@@ -347,7 +368,7 @@ export default function MediaConverterTool() {
           <span>{status}</span>
         </p>
         {downloadProgress && isBusy && (
-          <div className="mt-3 rounded-xl border border-line bg-white p-3">
+          <div className="mt-3 rounded-xl border border-line bg-white p-3 motion-safe:animate-hub-enter">
             <div className="mb-1 flex justify-between gap-3 text-xs text-muted">
               <span>Downloading FFmpeg core (~32 MB, one-time per browser cache)</span>
               <span>{Math.round(downloadProgress.progress * 100)}%</span>
@@ -362,17 +383,17 @@ export default function MediaConverterTool() {
           </div>
         )}
         {progress && isBusy && (
-          <div className="mt-3">
+          <div className="mt-3 motion-safe:animate-hub-enter">
             <div className="mb-1 flex justify-between text-xs text-muted"><span>Approximate FFmpeg progress</span><span>{Math.round(progress.progress * 100)}%</span></div>
             <progress className="h-2 w-full accent-brand" max="1" value={progress.progress} aria-label="Approximate conversion progress" />
             <p className="mt-1 text-[11px] text-muted">Progress may be inaccurate for some media and operations.</p>
           </div>
         )}
         {error && (
-          <p className="mt-3 flex items-start gap-2 text-sm text-red-700" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>
+          <p className="hub-notification--error mt-3 flex items-start gap-2 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>
         )}
         {result && outputURLRef.current && (
-          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="hub-results-panel--media mt-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-white p-3 motion-safe:animate-hub-enter sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="break-words text-sm font-bold text-ink">{result.fileName}</p>
               <p className="mt-1 text-xs text-muted">{result.outputFormat.toUpperCase()} · {formatBytes(result.outputSize)}</p>

@@ -86,9 +86,11 @@ export default function ImageCompressorTool() {
   const [maxDimension, setMaxDimension] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
   const runIdRef = useRef(0);
   const zipRunIdRef = useRef(0);
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -340,17 +342,31 @@ export default function ImageCompressorTool() {
           <h2 id="image-files-heading" className="mt-1 text-sm font-extrabold text-ink">Choose images to compress</h2>
         </div>
         <div
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
-        }}
-      >
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (isProcessing) return;
+            dragDepthRef.current += 1;
+            setIsDragActive(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+            if (dragDepthRef.current === 0) setIsDragActive(false);
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            dragDepthRef.current = 0;
+            setIsDragActive(false);
+            if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
+          }}
+        >
         <button
           type="button"
+          data-dragging={isDragActive}
           disabled={isProcessing || rawFiles.length >= MAX_FILES}
           onClick={() => fileInputRef.current?.click()}
-          className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-5 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
+          className={`hub-dropzone block w-full rounded-2xl border-2 border-dashed p-5 text-center transition-[border-color,background-color,box-shadow] duration-standard ease-standard disabled:cursor-not-allowed disabled:opacity-60 sm:p-10 ${isDragActive ? 'border-brand bg-brand-soft ring-2 ring-brand/20 shadow-soft' : 'border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
         >
           <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
           <span className="block font-bold text-ink">Drop images here or click to browse</span>
@@ -373,8 +389,8 @@ export default function ImageCompressorTool() {
         </div>
       </section>
 
-      {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
-      {errorMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMsg}</p>}
+      {notice && <p className="hub-notification--notice rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 motion-safe:animate-hub-enter" role="status">{notice}</p>}
+      {errorMsg && <p className="hub-notification--error rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert">{errorMsg}</p>}
 
       {isProcessing && (
         <div className="flex items-center gap-3 rounded-xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
@@ -384,7 +400,7 @@ export default function ImageCompressorTool() {
       )}
 
       {items.length > 0 && (
-        <section className="space-y-4" aria-label="Compressed images">
+        <section className="hub-results-panel--images space-y-4 motion-safe:animate-hub-enter" aria-label="Compressed images">
           <div className="flex flex-col justify-between gap-4 rounded-xl border border-brand/20 bg-brand-soft px-4 py-4 sm:flex-row sm:items-center sm:px-5">
             <div className="flex items-center gap-2.5">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
@@ -414,8 +430,8 @@ export default function ImageCompressorTool() {
           </div>
 
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
-            {items.map((item) => (
-              <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4">
+            {items.map((item, index) => (
+              <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4 motion-safe:animate-hub-card-enter" style={{ animationDelay: `${Math.min(index * 45, 135)}ms` }}>
                 <div className="flex min-w-0 items-center gap-3">
                   <ImageThumbnail blob={item.compressedBlob} />
                   <div className="min-w-0">
