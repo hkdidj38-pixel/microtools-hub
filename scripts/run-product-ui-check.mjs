@@ -15,7 +15,7 @@ const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-ui-check-'));
 const screenshotRoot = process.env.UI_SCREENSHOT_DIR
   ? path.resolve(process.env.UI_SCREENSHOT_DIR)
   : path.join(tempRoot, 'screenshots');
-const viewports = [320, 390, 768, 1440, 1920, 2560];
+const viewports = [320, 375, 390, 768, 1024, 1440, 1920, 2560];
 const pages = [
   ['home', '/'],
   ['image-compressor', '/tools/image-compressor/'],
@@ -78,7 +78,13 @@ async function captureScreenshot(page, filename, expectedViewport) {
   assert.deepEqual(configuredViewport, expectedViewport, `${filename} should use the configured ${expectedViewport.width}×${expectedViewport.height}px viewport.`);
   const actualViewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
   assert.deepEqual(actualViewport, expectedViewport, `${filename} should use the actual ${expectedViewport.width}×${expectedViewport.height}px browser viewport.`);
-  await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+  await page.evaluate(() => {
+    document.querySelectorAll('.hub-scroll-reveal').forEach((element) => {
+      element.classList.remove('hub-reveal-pending');
+      element.classList.add('hub-revealed');
+    });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  });
   await page.screenshot({
     path: path.join(screenshotRoot, filename),
     fullPage: true,
@@ -169,18 +175,18 @@ try {
         dimensions.document <= width && dimensions.body <= width,
         `${route} overflows horizontally at ${width}px: ${JSON.stringify(dimensions)}`,
       );
-      if ([320, 390, 768, 1440].includes(width)) {
+      if ([320, 375, 390, 768, 1024, 1440].includes(width)) {
         await captureScreenshot(page, `${slug}-${width}.png`, { width, height: 980 });
       }
     }
   }
-  console.log(`[ui] all ${pages.length} pages are overflow-free at ${viewports.join(', ')}px; responsive screenshots captured for 320, 390, 768, and 1440px`);
+  console.log(`[ui] all ${pages.length} pages are overflow-free at ${viewports.join(', ')}px; responsive screenshots captured for 320, 375, 390, 768, 1024, and 1440px`);
 
   // Cross-route fragment links must reach the toolbox after client navigation.
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 980 });
-    for (const name of ['Browse tools', 'Explore more tools', 'Back to all tools']) {
-      if (width === 390 && name === 'Browse tools') continue;
+    for (const name of ['Explore tools', 'Explore more tools', 'Back to all tools']) {
+      if (width === 390 && name === 'Explore tools') continue;
       await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });
       await page.getByRole('link', { name, exact: true }).click();
       await page.waitForURL(`${baseURL}/#toolbox`);
@@ -192,11 +198,87 @@ try {
       }, null, { timeout: 5000 });
     }
   }
-  console.log('[ui] tool-page fragment links reach the toolbox at mobile and desktop widths');
+  await page.goBack();
+  await page.waitForURL(`${baseURL}/tools/image-compressor/`);
+  await page.goForward();
+  await page.waitForURL(`${baseURL}/#toolbox`);
+  await page.waitForFunction(() => (document.getElementById('toolbox')?.getBoundingClientRect().top ?? 999) < 200);
+  console.log('[ui] tool-page fragment links and browser back/forward reach the toolbox at mobile and desktop widths');
+  await page.goto(`${baseURL}/#%`, { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: /Make small work feel effortless/ }).waitFor();
+  assert.equal(await page.evaluate(() => window.location.hash), '#%', 'Malformed fragments should be ignored for scrolling without blanking the page.');
+
+  // One-time reveals remain visible by default, and the mobile menu is keyboard operable.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  const classicSection = page.locator('#classic-tools');
+  await page.waitForFunction(() => document.getElementById('classic-tools')?.classList.contains('hub-reveal-pending'));
+  assert.ok(Number.parseFloat(await classicSection.evaluate((element) => getComputedStyle(element).opacity)) < 0.05, 'A below-fold section should begin in its pending reveal state.');
+  await classicSection.scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => {
+    const element = document.getElementById('classic-tools');
+    return element?.classList.contains('hub-revealed') && Number.parseFloat(getComputedStyle(element).opacity) > 0.99;
+  }, null, { timeout: 5_000 });
+  await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+  const menuButton = page.locator('[data-site-menu-toggle="true"]');
+  await menuButton.focus();
+  await menuButton.press('Enter');
+  assert.equal(await menuButton.getAttribute('aria-expanded'), 'true', 'Enter should open the mobile navigation.');
+  const mobileNavigation = page.getByRole('navigation', { name: 'Mobile navigation' });
+  await mobileNavigation.getByRole('link', { name: 'Classic utilities' }).focus();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('button', { name: 'Open navigation' }).getAttribute('aria-expanded'), 'false', 'Escape should close the mobile navigation.');
+  await page.getByRole('button', { name: 'Open navigation' }).waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-site-menu-toggle')), 'true', 'Escape should restore focus to the menu toggle.');
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Explore tools' }).click();
+  await page.waitForFunction(() => window.location.hash === '#toolbox' && (document.getElementById('toolbox')?.getBoundingClientRect().top ?? 999) < 200);
+  assert.equal(await page.getByRole('button', { name: 'Open navigation' }).getAttribute('aria-expanded'), 'false', 'Activating a menu link should close the disclosure.');
+  await page.getByRole('button', { name: 'Open navigation' }).waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-site-menu-toggle')), 'true', 'Activating a menu link should return focus to its toggle.');
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  await captureScreenshot(page, 'mobile-navigation-open-390.png', { width: 390, height: 844 });
+  await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  await page.locator('#site-mobile-navigation').getByText('Local image processing').waitFor();
+  await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Explore tools' }).click();
+  await page.waitForURL(`${baseURL}/#toolbox`);
+  await page.waitForFunction(() => (document.getElementById('toolbox')?.getBoundingClientRect().top ?? 999) < 200);
+  assert.equal(await page.locator('[data-site-menu-toggle="true"]').getAttribute('aria-expanded'), 'false', 'Following a cross-route mobile menu link should close the menu.');
+  console.log('[ui] one-time section reveal and mobile menu keyboard, cross-route anchor, focus-restore, and privacy-label behavior verified');
+
+  // Reduced motion makes all content visible and removes decorative animation.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  const reducedMotionState = await page.evaluate(() => {
+    const reveal = document.getElementById('classic-tools');
+    const title = document.querySelector('h1');
+    return {
+      pending: reveal?.classList.contains('hub-reveal-pending') ?? true,
+      opacity: Number.parseFloat(reveal ? getComputedStyle(reveal).opacity : '0'),
+      animationDuration: Number.parseFloat(title ? getComputedStyle(title).animationDuration : '1'),
+    };
+  });
+  assert.equal(reducedMotionState.pending, false, 'Reduced motion should not defer section visibility.');
+  assert.ok(reducedMotionState.opacity > 0.99, 'Reduced motion should leave below-fold content visible.');
+  assert.ok(reducedMotionState.animationDuration <= 0.001, `Reduced motion should suppress hero movement (${reducedMotionState.animationDuration}s).`);
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  const reducedMenuDuration = await page.getByRole('navigation', { name: 'Mobile navigation' }).evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration));
+  assert.ok(reducedMenuDuration <= 0.001, `Reduced motion should suppress mobile-menu motion (${reducedMenuDuration}s).`);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  console.log('[ui] reduced-motion mode disables hero/menu animation and keeps unrevealed sections visible');
 
   // Registry-driven discovery, category filters, empty state, and direct routes.
   await page.setViewportSize({ width: 1440, height: 980 });
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  const heroTiming = await page.locator('h1').evaluate((element) => ({
+    duration: Number.parseFloat(getComputedStyle(element).animationDuration),
+    delay: Number.parseFloat(getComputedStyle(element).animationDelay),
+  }));
+  const quickAccessDelay = await page.getByRole('complementary', { name: 'Toolbox overview' }).evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDelay));
+  assert.ok(heroTiming.duration > 0 && heroTiming.duration <= 0.4, `Hero entrance should be brief (${heroTiming.duration}s).`);
+  assert.ok(quickAccessDelay > heroTiming.delay, 'The hero preview should enter after the headline.');
   const placeholderColors = await page.locator('#tool-search').evaluate((input) => ({
     foreground: getComputedStyle(input, '::placeholder').color,
     background: getComputedStyle(input).backgroundColor,
@@ -223,20 +305,39 @@ try {
   await page.locator('#tool-search').fill('pdf');
   assert.equal(await page.locator('#toolbox a[href="/tools/pdf-merger"]').count(), 1, 'Search should find the PDF merger from metadata.');
   await page.locator('#tool-search').fill('');
+  const nativeViewTransitions = await page.evaluate(() => typeof document.startViewTransition === 'function');
+  await page.evaluate(() => {
+    window.__hubViewTransitionCalls = 0;
+    const originalTransition = document.startViewTransition?.bind(document);
+    if (originalTransition) {
+      document.startViewTransition = (callback) => {
+        window.__hubViewTransitionCalls += 1;
+        return originalTransition(callback);
+      };
+    }
+  });
   const imagesFilter = page.getByRole('button', { name: /Images/ });
   await imagesFilter.focus();
   await imagesFilter.press('Enter');
   assert.equal(await page.locator('#toolbox a[href^="/tools/"]').count(), 1, 'Category filtering should use registered tool metadata and work from the keyboard.');
+  const viewTransitionCalls = await page.evaluate(() => window.__hubViewTransitionCalls);
+  if (nativeViewTransitions) assert.ok(viewTransitionCalls > 0, 'Local category changes should use native View Transitions when supported.');
   await page.getByRole('button', { name: /All tools/ }).click();
   await page.locator('#tool-search').fill('no matching tool');
   await page.getByRole('heading', { name: 'Nothing in this search.' }).waitFor();
   await page.getByRole('button', { name: 'Show every tool' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('#toolbox a[href^="/tools/"]').length === 4, null, { timeout: 5_000 });
   assert.equal(await page.locator('#toolbox a[href^="/tools/"]').count(), 4);
   console.log(`[ui] registry discovery and controls verified; placeholder ${placeholderContrast.toFixed(2)}:1, light focus ring ${lightFocusContrast.toFixed(2)}:1`);
 
   // Real image compression in the browser worker and a real ZIP download.
   await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });
   assert.match(await page.locator('body').innerText(), /Local image processing/);
+  const imageDropArea = page.getByRole('button', { name: /Drop images here or click to browse/ });
+  await imageDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  assert.equal(await imageDropArea.getAttribute('data-dragging'), 'true', 'Image drop target should reflect drag-enter state.');
+  await imageDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragleave', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  assert.equal(await imageDropArea.getAttribute('data-dragging'), 'false', 'Image drop target should clear drag state on leave.');
   const dataUrl = await page.evaluate(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 32;
@@ -269,6 +370,11 @@ try {
   // Real PDF page counting, reorder, merge, and download.
   await page.goto(`${baseURL}/tools/pdf-merger/`, { waitUntil: 'networkidle' });
   assert.match(await page.locator('body').innerText(), /Local PDF processing/);
+  const pdfDropArea = page.getByRole('button', { name: 'Choose PDF files or drop them here' });
+  await pdfDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  assert.equal(await pdfDropArea.getAttribute('data-dragging'), 'true', 'PDF drop target should reflect drag-enter state.');
+  await pdfDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragleave', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  assert.equal(await pdfDropArea.getAttribute('data-dragging'), 'false', 'PDF drop target should clear drag state on leave.');
   const alphaPdf = await makePdf('alpha document');
   const betaPdf = await makePdf('beta document');
   await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles([
@@ -302,7 +408,15 @@ try {
   await page.getByRole('button', { name: 'Remove alpha.pdf' }).click();
   await page.getByRole('button', { name: 'Remove alpha.pdf' }).waitFor({ state: 'detached' });
   assert.equal(await page.getByRole('link', { name: 'Download merged PDF' }).count(), 0, 'Removing a source PDF should clear its previous merge result.');
-  console.log('[ui] PDF pages counted, keyboard reorder, merged output downloaded, output page count and keyboard FAQ verified');
+  console.log('[ui] PDF pages counted, keyboard reorder/removal, merged output downloaded, output page count and keyboard FAQ verified');
+
+  await page.goto(`${baseURL}/tools/media-converter/`, { waitUntil: 'networkidle' });
+  const mediaDropArea = page.locator('label[for="media-file"]');
+  await mediaDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  assert.equal(await mediaDropArea.getAttribute('data-dragging'), 'true', 'Media drop target should reflect drag-enter state.');
+  await mediaDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragleave', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  assert.equal(await mediaDropArea.getAttribute('data-dragging'), 'false', 'Media drop target should clear drag state on leave.');
+  console.log('[ui] image, PDF, and media drop targets reflect real drag-enter and drag-leave state');
 
   // The inspector must remain a metadata/edge tool and fail closed in this static preview.
   await page.goto(`${baseURL}/tools/url-screenshot/`, { waitUntil: 'networkidle' });
