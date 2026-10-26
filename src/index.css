@@ -5,7 +5,7 @@
 @layer base {
   :root {
     color-scheme: light;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--hub-font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -33,6 +33,7 @@
     margin: 0;
     background: var(--hub-paper);
     color: var(--hub-ink);
+    font-family: var(--hub-font-sans);
     overflow-wrap: anywhere;
   }
 
@@ -49,8 +50,46 @@
   }
 
   ::selection {
-    background: var(--hub-lime);
+    background: var(--hub-sage);
     color: var(--hub-ink);
+  }
+}
+
+@keyframes hub-float-gentle {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+@keyframes hub-float-chip {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -3.5px, 0);
+  }
+}
+
+@keyframes hub-orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hub-geo-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -60,7 +99,7 @@
   }
 
   .hub-eyebrow {
-    @apply text-xs font-bold uppercase tracking-[0.16em] text-brand;
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-brand;
   }
 
   .hub-input {
@@ -68,11 +107,121 @@
   }
 
   .hub-button-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-hub-control bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-fast ease-standard hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-hub-control bg-brand-dark px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-fast ease-standard hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .hub-button-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors duration-fast ease-standard hover:border-brand/30 hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors duration-fast ease-standard hover:border-brand/35 hover:bg-sage/45 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Editorial Hero Canvas: restrained botanical washes + crisp architectural grid hairlines */
+  .hub-editorial-canvas {
+    background-color: var(--hub-paper);
+    background-image:
+      radial-gradient(46rem 32rem at 86% 18%, rgb(var(--hub-sage-rgb) / 0.72), transparent 70%),
+      radial-gradient(36rem 26rem at 12% 10%, rgb(var(--hub-peach-rgb) / 0.42), transparent 72%),
+      radial-gradient(30rem 24rem at 74% 88%, rgb(var(--hub-lavender-rgb) / 0.36), transparent 70%),
+      linear-gradient(to right, rgb(var(--hub-line-rgb) / 0.42) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--hub-line-rgb) / 0.42) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 4.5rem 4.5rem, 4.5rem 4.5rem;
+    background-position: center top;
+  }
+
+  /* Smooth search focus input */
+  .hub-search-input {
+    border: 1px solid rgb(var(--hub-line-rgb));
+    background-color: #ffffff;
+    box-shadow: var(--hub-shadow-soft);
+    transition:
+      border-color var(--hub-motion-standard) var(--hub-ease-standard),
+      box-shadow var(--hub-motion-standard) var(--hub-ease-emphasized);
+  }
+
+  .hub-search-input:hover {
+    border-color: rgb(var(--hub-brand-rgb) / 0.45);
+  }
+
+  .hub-search-input:focus:not(:focus-visible) {
+    outline: none;
+    border-color: rgb(var(--hub-brand-rgb));
+    box-shadow:
+      0 0 0 4px rgb(var(--hub-sage-rgb) / 0.85),
+      var(--hub-shadow-lift);
+  }
+
+  /* Soft floating Quick Access workspace panel (pauses on hover/focus for effortless pointer interaction) */
+  .hub-float-panel {
+    will-change: transform;
+    animation: hub-float-gentle 6.6s ease-in-out infinite;
+  }
+
+  .hub-float-panel:hover,
+  .hub-float-panel:focus-within {
+    animation-play-state: paused;
+  }
+
+  /* Decorative orbit track & floating status chips */
+  .hub-orbit-track {
+    animation: hub-orbit-spin 28s linear infinite;
+  }
+
+  .hub-orbit-track--reverse {
+    animation: hub-orbit-spin 36s linear infinite reverse;
+  }
+
+  .hub-float-chip {
+    animation: hub-float-chip 5.6s ease-in-out infinite;
+  }
+
+  .hub-float-chip--delayed {
+    animation: hub-float-chip 6.8s ease-in-out 1.4s infinite;
+  }
+
+  /* Small rotating geometric accent */
+  .hub-geo-spin {
+    transform-origin: center;
+    animation: hub-geo-rotate 26s linear infinite;
+  }
+
+  /* Editorial Tool Card: top-border reveal + gentle hover elevation */
+  .hub-tool-card {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transition:
+      transform var(--hub-motion-standard) var(--hub-ease-emphasized),
+      box-shadow var(--hub-motion-standard) var(--hub-ease-emphasized),
+      border-color var(--hub-motion-fast) var(--hub-ease-standard);
+  }
+
+  .hub-tool-card::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    background: var(--card-accent, var(--hub-brand));
+    content: "";
+    pointer-events: none;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--hub-motion-standard) var(--hub-ease-emphasized);
+  }
+
+  .hub-tool-card:hover,
+  .hub-tool-card:focus-visible {
+    border-color: rgb(var(--hub-brand-rgb) / 0.32);
+    box-shadow: var(--hub-shadow-lift);
+    transform: translateY(-3px);
+  }
+
+  .hub-tool-card:hover::before,
+  .hub-tool-card:focus-visible::before {
+    transform: scaleX(1);
+  }
+
+  .hub-tool-card:active {
+    transform: translateY(0);
   }
 
   .hub-scroll-reveal {
@@ -104,12 +253,12 @@
 
   .hub-filter-chip::after {
     position: absolute;
-    right: 1rem;
-    bottom: 0.24rem;
-    left: 1rem;
+    right: 0.9rem;
+    bottom: 0.22rem;
+    left: 0.9rem;
     height: 2px;
     border-radius: 999px;
-    background: var(--hub-lime);
+    background: var(--hub-sage);
     content: "";
     pointer-events: none;
     transform: scaleX(0);
@@ -162,8 +311,8 @@
   }
 }
 
-/* Two-color focus ring: the lime inner outline reads on dark surfaces, while
-   the spruce outer ring reads on light surfaces. */
+/* Two-color focus ring: the pale sage inner outline reads on dark surfaces, while
+   the deep olive outer ring reads on light surfaces. */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -213,6 +362,21 @@ summary:focus-visible,
 
   html {
     scroll-behavior: auto;
+  }
+
+  .hub-float-panel,
+  .hub-orbit-track,
+  .hub-orbit-track--reverse,
+  .hub-float-chip,
+  .hub-float-chip--delayed,
+  .hub-geo-spin {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .hub-tool-card:hover,
+  .hub-tool-card:focus-visible {
+    transform: none !important;
   }
 
   .hub-scroll-reveal,

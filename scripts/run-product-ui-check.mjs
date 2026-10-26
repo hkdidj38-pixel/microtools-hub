@@ -428,12 +428,37 @@ try {
   const viewTransitionCalls = await page.evaluate(() => window.__hubViewTransitionCalls);
   if (nativeViewTransitions) assert.ok(viewTransitionCalls > 0, 'Local category changes should use native View Transitions when supported.');
   await page.getByRole('button', { name: /All tools/ }).click();
+  await page.keyboard.press('ArrowRight');
+  assert.match(await page.evaluate(() => document.activeElement?.textContent ?? ''), /Developer/, 'ArrowRight should move focus to the next category filter chip.');
+  await page.locator('body').click({ position: { x: 12, y: 12 } });
+  await page.keyboard.press('/');
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'tool-search', 'Pressing / outside inputs should focus the tool search field.');
+  await page.keyboard.type('pdf');
+  assert.equal(await page.locator('#tool-search').inputValue(), 'pdf');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#tool-search').inputValue(), '', 'Escape should clear a populated search query.');
   await page.locator('#tool-search').fill('no matching tool');
   await page.getByRole('heading', { name: 'Nothing in this search.' }).waitFor();
   await page.getByRole('button', { name: 'Show every tool' }).click();
   await page.waitForFunction(() => document.querySelectorAll('#toolbox a[href^="/tools/"]').length === 4, null, { timeout: 5_000 });
   assert.equal(await page.locator('#toolbox a[href^="/tools/"]').count(), 4);
-  console.log(`[ui] registry discovery and controls verified; placeholder ${placeholderContrast.toFixed(2)}:1, light focus ring ${lightFocusContrast.toFixed(2)}:1`);
+  assert.match(await page.locator('#privacy').innerText(), /Your files are your business\./, 'Privacy section should render the editorial headline.');
+  assert.match(await page.locator('#privacy').innerText(), /Disclosed edge path for URL inspection/i, 'Privacy section must disclose the edge-assisted URL inspector.');
+
+  // Verify the initial homepage load does not eagerly fetch heavy tool chunks, workers, or FFmpeg WASM.
+  const lazyCheckPage = await context.newPage();
+  const homeAssetPaths = [];
+  lazyCheckPage.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.origin === baseURL) homeAssetPaths.push(url.pathname);
+  });
+  await lazyCheckPage.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  const eagerHeavyAssets = homeAssetPaths.filter((pathname) => (
+    /ffmpeg-core|\/part-\d+|image-compress\.worker|pdf-merger\.worker|png-quantize\.worker/i.test(pathname)
+  ));
+  assert.deepEqual(eagerHeavyAssets, [], `Homepage must not eagerly load heavy tool engines or workers: ${eagerHeavyAssets.join(', ')}`);
+  await lazyCheckPage.close();
+  console.log(`[ui] registry discovery, keyboard shortcuts, lazy-loading guard, and controls verified; placeholder ${placeholderContrast.toFixed(2)}:1, light focus ring ${lightFocusContrast.toFixed(2)}:1`);
 
   // Real image compression in the browser worker and a real ZIP download.
   await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });

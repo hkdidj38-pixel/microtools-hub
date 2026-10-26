@@ -2,7 +2,9 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, HelpCircle, ShieldCheck } from 'lucide-react';
 import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
 import { useScrollReveal } from '@/lib/useScrollReveal';
+import { getCategoryAccent } from '@/lib/categoryStyles';
 import type { ToolMeta } from '@/lib/registry';
 
 interface ToolLayoutProps {
@@ -13,6 +15,7 @@ interface ToolLayoutProps {
 export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
   const isEdgeTool = meta.privacy.mode === 'edge';
   const faqRevealRef = useScrollReveal<HTMLElement>();
+  const accent = getCategoryAccent(meta.category);
 
   useEffect(() => {
     document.title = `${meta.name} — MicroTools Hub`;
@@ -23,41 +26,80 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col bg-paper text-ink">
-      <a href="#tool-main" className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+      <a
+        href="#tool-main"
+        className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
         Skip to tool
       </a>
       <SiteHeader variant="tool" privacy={meta.privacy} />
 
       <main id="tool-main" className="hub-container min-w-0 w-full flex-1 py-5 sm:py-10 lg:py-12">
         <div className="mx-auto min-w-0 max-w-5xl">
-          <nav aria-label="Breadcrumb" className="mb-5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-muted sm:mb-7">
-            <Link to="/" className="rounded-sm transition hover:text-brand">All tools</Link>
+          <nav
+            aria-label="Breadcrumb"
+            className="mb-5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-muted sm:mb-7"
+          >
+            <Link to="/" className="rounded-sm font-sans font-semibold transition hover:text-brand-dark">
+              All tools
+            </Link>
             <span aria-hidden="true" className="text-muted/50">/</span>
             <span>{meta.category}</span>
             <span aria-hidden="true" className="text-muted/50">/</span>
-            <span aria-current="page" className="min-w-0 break-words text-ink">{meta.name}</span>
+            <span aria-current="page" className="min-w-0 break-words font-sans font-semibold text-ink">
+              {meta.name}
+            </span>
           </nav>
 
           <div className="mb-5 grid min-w-0 gap-4 motion-safe:animate-hub-enter sm:mb-7 sm:gap-5 md:grid-cols-[1fr_auto] md:items-end">
             <div className="min-w-0 max-w-3xl">
-              <p className="hub-eyebrow">{meta.category} toolkit</p>
-              <h1 className="mt-2 break-words text-[clamp(1.7rem,7.5vw,3.1rem)] font-black leading-[1.08] tracking-[-0.045em] text-ink sm:mt-3 sm:text-4xl lg:text-5xl">{meta.name}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted sm:text-base sm:leading-7">{meta.description}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] ${accent.badge}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} aria-hidden="true" />
+                  {meta.category} toolkit
+                </span>
+              </div>
+              <h1 className="mt-3 break-words text-[clamp(1.7rem,7.5vw,3.1rem)] font-black leading-[1.08] tracking-[-0.04em] text-ink sm:text-4xl lg:text-5xl">
+                {meta.name}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted sm:text-base sm:leading-7">
+                {meta.description}
+              </p>
             </div>
-            <Link to="/#toolbox" className="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2 text-xs font-extrabold text-ink transition hover:border-brand/30 hover:text-brand md:mb-1">
+            <Link
+              to="/#toolbox"
+              className="inline-flex min-h-10 w-fit items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-xs font-extrabold text-ink shadow-sm transition hover:border-brand/35 hover:bg-sage/55 hover:text-brand-dark md:mb-1"
+            >
               Explore more tools <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
 
-          <aside className={`mb-4 flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 motion-safe:animate-hub-enter sm:mb-5 sm:px-5 ${isEdgeTool ? 'border-amber-200 bg-amber-50/80 text-amber-950' : 'border-brand/15 bg-brand-soft/70 text-brand-dark'}`} style={{ animationDelay: '70ms' }} aria-label="How this tool handles your data">
-            <ShieldCheck className={`mt-0.5 h-4 w-4 shrink-0 ${isEdgeTool ? 'text-amber-800' : 'text-brand'}`} aria-hidden="true" />
+          <aside
+            className={`mb-4 flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 motion-safe:animate-hub-enter sm:mb-5 sm:px-5 ${
+              isEdgeTool
+                ? 'border-peach-ink/20 bg-peach/75 text-peach-ink'
+                : 'border-brand/15 bg-sage/75 text-brand-dark'
+            }`}
+            style={{ animationDelay: '70ms' }}
+            aria-label="How this tool handles your data"
+          >
+            <ShieldCheck
+              className={`mt-0.5 h-4 w-4 shrink-0 ${isEdgeTool ? 'text-peach-ink' : 'text-brand'}`}
+              aria-hidden="true"
+            />
             <div className="min-w-0">
               <p className="font-bold">{meta.privacy.label}</p>
               <p className="mt-0.5 text-xs leading-5 sm:text-sm">{meta.privacy.description}</p>
             </div>
           </aside>
 
-          <section className="min-w-0 rounded-3xl border border-line bg-white p-3 shadow-soft motion-safe:animate-hub-enter sm:rounded-[2rem] sm:p-5 lg:p-7" style={{ animationDelay: '120ms' }} aria-label={`${meta.name} workspace`}>
+          <section
+            className="min-w-0 rounded-3xl border border-line bg-white p-3 shadow-soft motion-safe:animate-hub-enter sm:rounded-hub-panel sm:p-5 lg:p-7"
+            style={{ animationDelay: '120ms' }}
+            aria-label={`${meta.name} workspace`}
+          >
             {children}
           </section>
 
@@ -66,17 +108,28 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
               <div className="mb-4 flex min-w-0 items-end justify-between gap-4 sm:mb-5">
                 <div className="min-w-0">
                   <p className="hub-eyebrow">Good to know</p>
-                  <h2 id="faq-heading" className="mt-2 flex items-center gap-2 text-xl font-black tracking-tight text-ink sm:text-2xl">
+                  <h2
+                    id="faq-heading"
+                    className="mt-2 flex items-center gap-2 text-xl font-black tracking-tight text-ink sm:text-2xl"
+                  >
                     <HelpCircle className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" /> Frequently asked questions
                   </h2>
                 </div>
               </div>
               <div className="grid gap-2.5 md:grid-cols-2 md:gap-3">
                 {meta.faqs.map((faq) => (
-                  <details key={faq.q} className="group min-w-0 rounded-2xl border border-line bg-white transition open:border-brand/20 open:bg-white">
-                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-4 py-3.5 text-sm font-bold leading-5 text-ink marker:hidden hover:text-brand sm:px-5">
+                  <details
+                    key={faq.q}
+                    className="group min-w-0 rounded-2xl border border-line bg-white transition open:border-brand/25 open:shadow-soft"
+                  >
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-4 py-3.5 text-sm font-bold leading-5 text-ink marker:hidden hover:text-brand-dark sm:px-5">
                       <span>{faq.q}</span>
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper text-brand transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+                      <span
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper font-mono text-sm text-brand-dark transition-transform group-open:rotate-45 group-open:bg-sage"
+                        aria-hidden="true"
+                      >
+                        +
+                      </span>
                     </summary>
                     <p className="px-4 pb-4 text-sm leading-6 text-muted sm:px-5 sm:pb-5">{faq.a}</p>
                   </details>
@@ -87,12 +140,7 @@ export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
         </div>
       </main>
 
-      <footer className="mt-4 border-t border-line bg-white">
-        <div className="hub-container flex flex-col gap-3 py-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:py-6">
-          <p className="font-bold text-ink">MicroTools Hub <span className="font-normal text-muted">· Thoughtful little tools for everyday work.</span></p>
-          <Link to="/#toolbox" className="inline-flex min-h-9 w-fit items-center gap-1 rounded-md font-bold text-brand hover:underline">Back to all tools <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
-        </div>
-      </footer>
+      <SiteFooter variant="tool" />
     </div>
   );
 };

@@ -91,23 +91,23 @@ for (const folder of folders) {
   `;
   const staticToolContent = `
     <main class="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
-      <a class="mb-6 inline-flex text-sm text-slate-500" href="/">← Back to all tools</a>
+      <a class="mb-6 inline-flex text-sm font-semibold text-muted" href="/">← Back to all tools</a>
       <div class="mb-8">
-        <span class="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-600">${esc(meta.category)}</span>
-        <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">${esc(meta.name)}</h1>
-        <p class="mt-2 max-w-3xl text-base text-slate-600 sm:text-lg">${esc(meta.description)}</p>
+        <span class="rounded-full bg-sage px-3 py-1 font-mono text-xs font-semibold uppercase tracking-wider text-brand-dark">${esc(meta.category)}</span>
+        <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">${esc(meta.name)}</h1>
+        <p class="mt-2 max-w-3xl text-base text-muted sm:text-lg">${esc(meta.description)}</p>
         <aside class="mt-5 rounded-2xl border border-brand/15 bg-brand-soft p-4 text-sm leading-6 text-brand-dark" aria-label="How this tool handles your data">
           <strong>${esc(meta.privacy?.label || 'Processing details')}</strong>
           <p>${esc(meta.privacy?.description || 'See this tool’s interface for processing details.')}</p>
         </aside>
       </div>
       <section aria-labelledby="faq-heading" class="mb-12">
-        <h2 id="faq-heading" class="mb-4 text-xl font-bold text-slate-900">Frequently Asked Questions</h2>
+        <h2 id="faq-heading" class="mb-4 text-xl font-bold text-ink">Frequently Asked Questions</h2>
         <div class="grid gap-4">
           ${(meta.faqs || []).map((faq) => `
-            <article class="rounded-xl border border-slate-200 bg-white p-5">
-              <h3 class="mb-1.5 font-semibold text-slate-900">${esc(faq.q)}</h3>
-              <p class="text-sm leading-relaxed text-slate-600">${esc(faq.a)}</p>
+            <article class="rounded-2xl border border-line bg-white p-5">
+              <h3 class="mb-1.5 font-semibold text-ink">${esc(faq.q)}</h3>
+              <p class="text-sm leading-relaxed text-muted">${esc(faq.a)}</p>
             </article>
           `).join('')}
         </div>
