@@ -66,9 +66,9 @@ function stopPreview() {
   }
 }
 
-async function makePdf(text) {
+async function makePdf(text, width = 300) {
   const document = await PDFDocument.create();
-  const page = document.addPage([300, 200]);
+  const page = document.addPage([width, 200]);
   page.drawText(text, { x: 24, y: 150, size: 14 });
   return Buffer.from(await document.save());
 }
@@ -228,14 +228,15 @@ try {
   await mobileNavigation.getByRole('link', { name: 'Classic utilities' }).focus();
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('button', { name: 'Open navigation' }).getAttribute('aria-expanded'), 'false', 'Escape should close the mobile navigation.');
-  await page.getByRole('button', { name: 'Open navigation' }).waitFor();
+  await page.waitForFunction(() => document.activeElement?.getAttribute('data-site-menu-toggle') === 'true');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-site-menu-toggle')), 'true', 'Escape should restore focus to the menu toggle.');
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Explore tools' }).click();
   await page.waitForFunction(() => window.location.hash === '#toolbox' && (document.getElementById('toolbox')?.getBoundingClientRect().top ?? 999) < 200);
   assert.equal(await page.getByRole('button', { name: 'Open navigation' }).getAttribute('aria-expanded'), 'false', 'Activating a menu link should close the disclosure.');
   await page.getByRole('button', { name: 'Open navigation' }).waitFor();
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-site-menu-toggle')), 'true', 'Activating a menu link should return focus to its toggle.');
+  await page.waitForFunction(() => document.activeElement?.id === 'toolbox');
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'toolbox', 'Activating a menu link should focus its destination.');
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await captureScreenshot(page, 'mobile-navigation-open-390.png', { width: 390, height: 844 });
   await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });
@@ -245,7 +246,27 @@ try {
   await page.waitForURL(`${baseURL}/#toolbox`);
   await page.waitForFunction(() => (document.getElementById('toolbox')?.getBoundingClientRect().top ?? 999) < 200);
   assert.equal(await page.locator('[data-site-menu-toggle="true"]').getAttribute('aria-expanded'), 'false', 'Following a cross-route mobile menu link should close the menu.');
-  console.log('[ui] one-time section reveal and mobile menu keyboard, cross-route anchor, focus-restore, and privacy-label behavior verified');
+  await page.waitForFunction(() => document.activeElement?.id === 'toolbox');
+  // Navigation must move keyboard traversal to the destination, including repeated fragments.
+  for (const route of ['/', '/tools/image-compressor/']) {
+    await page.goto(`${baseURL}${route}`, { waitUntil: 'networkidle' });
+    for (let repeat = 0; repeat < 2; repeat += 1) {
+      await page.getByRole('button', { name: 'Open navigation' }).click();
+      const classicLink = page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Classic utilities' });
+      await classicLink.focus();
+      await classicLink.press('Enter');
+      await page.waitForFunction(() => {
+        const top = document.getElementById('classic-tools')?.getBoundingClientRect().top ?? Infinity;
+        return window.location.hash === '#classic-tools' && document.activeElement?.id === 'classic-tools' && top >= 0 && top < 200;
+      });
+      assert.equal(await menuButton.getAttribute('aria-expanded'), 'false', 'Navigation should close the mobile disclosure.');
+      await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('href')), '/word-counter/', 'Tab after section navigation should reach the first destination link.');
+      assert.ok(await classicSection.evaluate((element) => element.getBoundingClientRect().top < 200), 'Keyboard traversal should remain at the destination.');
+      assert.equal(await classicSection.getAttribute('tabindex'), null, 'Temporary fragment focus should not leave a tabindex behind.');
+    }
+  }
+  console.log('[ui] one-time reveal, Escape focus restoration, destination keyboard traversal, repeated/cross-route fragments, and privacy labels verified');
 
   // Reduced motion makes all content visible and removes decorative animation.
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -319,6 +340,7 @@ try {
   const imagesFilter = page.getByRole('button', { name: /Images/ });
   await imagesFilter.focus();
   await imagesFilter.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('#toolbox a[href^="/tools/"]').length === 1);
   assert.equal(await page.locator('#toolbox a[href^="/tools/"]').count(), 1, 'Category filtering should use registered tool metadata and work from the keyboard.');
   const viewTransitionCalls = await page.evaluate(() => window.__hubViewTransitionCalls);
   if (nativeViewTransitions) assert.ok(viewTransitionCalls > 0, 'Local category changes should use native View Transitions when supported.');
@@ -376,7 +398,7 @@ try {
   await pdfDropArea.evaluate((element) => element.dispatchEvent(new DragEvent('dragleave', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
   assert.equal(await pdfDropArea.getAttribute('data-dragging'), 'false', 'PDF drop target should clear drag state on leave.');
   const alphaPdf = await makePdf('alpha document');
-  const betaPdf = await makePdf('beta document');
+  const betaPdf = await makePdf('beta document', 400);
   await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles([
     { name: 'alpha.pdf', mimeType: 'application/pdf', buffer: alphaPdf },
     { name: 'beta.pdf', mimeType: 'application/pdf', buffer: betaPdf },
@@ -401,6 +423,7 @@ try {
   await mergedDownload.saveAs(mergedPath);
   const mergedDocument = await PDFDocument.load(fs.readFileSync(mergedPath));
   assert.equal(mergedDocument.getPageCount(), 2, 'Merged PDF should contain the two selected pages.');
+  assert.deepEqual(mergedDocument.getPages().map((pdfPage) => pdfPage.getWidth()), [400, 300], 'Downloaded pages must match the displayed PDF order.');
   const pdfFaq = page.locator('details summary').first();
   await pdfFaq.focus();
   await pdfFaq.press('Enter');
@@ -409,6 +432,50 @@ try {
   await page.getByRole('button', { name: 'Remove alpha.pdf' }).waitFor({ state: 'detached' });
   assert.equal(await page.getByRole('link', { name: 'Download merged PDF' }).count(), 0, 'Removing a source PDF should clear its previous merge result.');
   console.log('[ui] PDF pages counted, keyboard reorder/removal, merged output downloaded, output page count and keyboard FAQ verified');
+
+  // Hold transition callbacks to exercise a job start before an asynchronous edit could commit.
+  // This makes the regression deterministic across browser speeds without delaying file workers.
+  const gammaPdf = await makePdf('gamma document', 500);
+  for (const edit of ['reorder', 'remove']) {
+    await page.goto(`${baseURL}/tools/pdf-merger/`, { waitUntil: 'networkidle' });
+    await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles([
+      { name: 'alpha.pdf', mimeType: 'application/pdf', buffer: alphaPdf },
+      { name: 'beta.pdf', mimeType: 'application/pdf', buffer: betaPdf },
+      { name: 'gamma.pdf', mimeType: 'application/pdf', buffer: gammaPdf },
+    ]);
+    await page.waitForFunction(() => {
+      const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Merge PDFs');
+      return Boolean(button && !button.disabled);
+    });
+    await page.evaluate(async (action) => {
+      const original = document.startViewTransition;
+      let release;
+      const ready = new Promise((resolve) => { release = resolve; });
+      if (original) document.startViewTransition = (update) => original.call(document, () => ready.then(update));
+      try {
+        const label = action === 'reorder' ? 'Move gamma.pdf up' : 'Remove alpha.pdf';
+        document.querySelector(`button[aria-label="${label}"]`).click();
+        await Promise.resolve();
+        [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Merge PDFs').click();
+      } finally {
+        release();
+        document.startViewTransition = original;
+      }
+    }, edit);
+    const outputLink = page.getByRole('link', { name: 'Download merged PDF' });
+    await outputLink.waitFor({ timeout: 30_000 });
+    const downloadPromise = page.waitForEvent('download');
+    await outputLink.click();
+    const download = await downloadPromise;
+    const outputPath = path.join(tempRoot, `rapid-${edit}.pdf`);
+    await download.saveAs(outputPath);
+    const output = await PDFDocument.load(fs.readFileSync(outputPath));
+    const expectedWidths = edit === 'reorder' ? [300, 500, 400] : [400, 500];
+    const expectedNames = edit === 'reorder' ? ['alpha.pdf', 'gamma.pdf', 'beta.pdf'] : ['beta.pdf', 'gamma.pdf'];
+    assert.deepEqual(await page.locator('ol li p.truncate').allTextContents(), expectedNames, 'The file list should reflect the latest edit.');
+    assert.deepEqual(output.getPages().map((pdfPage) => pdfPage.getWidth()), expectedWidths, `A merge immediately after ${edit} must use the latest inputs.`);
+  }
+  console.log('[ui] rapid PDF reorder/removal followed immediately by Merge exports the latest selected pages in order');
 
   await page.goto(`${baseURL}/tools/media-converter/`, { waitUntil: 'networkidle' });
   const mediaDropArea = page.locator('label[for="media-file"]');

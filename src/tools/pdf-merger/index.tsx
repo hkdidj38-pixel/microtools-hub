@@ -10,7 +10,6 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
-import { runWithViewTransition } from '@/lib/motion';
 import {
   estimatePdfPageCount,
   formatPdfBytes,
@@ -322,7 +321,7 @@ export default function PdfMergerTool() {
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => runWithViewTransition(() => movePdf(index, -1))}
+                    onClick={() => movePdf(index, -1)}
                     disabled={isMerging || index === 0}
                     className="rounded-lg border border-line p-2 text-muted hover:bg-paper disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={`Move ${entry.file.name} up`}
@@ -330,7 +329,7 @@ export default function PdfMergerTool() {
                   ><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
                   <button
                     type="button"
-                    onClick={() => runWithViewTransition(() => movePdf(index, 1))}
+                    onClick={() => movePdf(index, 1)}
                     disabled={isMerging || index === pdfs.length - 1}
                     className="rounded-lg border border-line p-2 text-muted hover:bg-paper disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={`Move ${entry.file.name} down`}
@@ -338,7 +337,7 @@ export default function PdfMergerTool() {
                   ><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
                   <button
                     type="button"
-                    onClick={() => runWithViewTransition(() => removePdf(entry.id))}
+                    onClick={() => removePdf(entry.id)}
                     disabled={isMerging}
                     className="rounded-lg border border-line p-2 text-muted hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={`Remove ${entry.file.name}`}
