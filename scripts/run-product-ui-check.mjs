@@ -129,10 +129,13 @@ async function waitForRevealOpacity(page, { id, state, threshold, description })
       return expectedState === 'pending' ? opacity < opacityThreshold : opacity > opacityThreshold;
     }, { elementId: id, expectedClass: className, expectedState: state, opacityThreshold: threshold }, { timeout: 5_000 });
   } catch (cause) {
-    const observed = await page.locator(`#${id}`).evaluate((element) => ({
-      classes: [...element.classList],
-      opacity: Number.parseFloat(getComputedStyle(element).opacity),
-    })).catch(() => ({ classes: [], opacity: null }));
+    const observed = await page.evaluate((elementId) => {
+      const element = document.getElementById(elementId);
+      return element ? {
+        classes: [...element.classList],
+        opacity: Number.parseFloat(getComputedStyle(element).opacity),
+      } : { classes: [], opacity: null };
+    }, id).catch(() => ({ classes: [], opacity: null }));
     throw new Error(`Timed out waiting for ${description}; observed ${JSON.stringify(observed)}.`, { cause });
   }
 }
@@ -177,6 +180,24 @@ try {
     }
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  // Missing reveal targets must report the assertion failure without a second locator wait.
+  const revealDiagnosticPage = await context.newPage();
+  const diagnosticStarted = performance.now();
+  await assert.rejects(waitForRevealOpacity(revealDiagnosticPage, {
+    id: 'classic-tools',
+    state: 'pending',
+    threshold: 0.05,
+    description: 'a missing reveal target',
+  }), (error) => {
+    assert.equal(error.message, 'Timed out waiting for a missing reveal target; observed {"classes":[],"opacity":null}.');
+    assert.equal(error.cause?.name, 'TimeoutError', 'Reveal diagnostics should preserve the original assertion timeout.');
+    return true;
+  });
+  const diagnosticElapsed = performance.now() - diagnosticStarted;
+  assert.ok(diagnosticElapsed < 10_000, `Missing-target diagnostics should finish within 10 seconds, took ${Math.round(diagnosticElapsed)}ms.`);
+  await revealDiagnosticPage.close();
+  console.log(`[ui] missing reveal target reports diagnostics in ${Math.round(diagnosticElapsed)}ms without an additional locator wait`);
 
   // Confirm prerendered tool content is styled and readable even before client hydration.
   const prerenderContext = await browser.newContext({
