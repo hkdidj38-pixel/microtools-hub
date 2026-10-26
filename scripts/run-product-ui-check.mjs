@@ -119,6 +119,24 @@ function contrastRatio(foreground, background) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
+async function waitForRevealOpacity(page, { id, state, threshold, description }) {
+  const className = state === 'pending' ? 'hub-reveal-pending' : 'hub-revealed';
+  try {
+    await page.waitForFunction(({ elementId, expectedClass, expectedState, opacityThreshold }) => {
+      const element = document.getElementById(elementId);
+      if (!element?.classList.contains(expectedClass)) return false;
+      const opacity = Number.parseFloat(getComputedStyle(element).opacity);
+      return expectedState === 'pending' ? opacity < opacityThreshold : opacity > opacityThreshold;
+    }, { elementId: id, expectedClass: className, expectedState: state, opacityThreshold: threshold }, { timeout: 5_000 });
+  } catch (cause) {
+    const observed = await page.locator(`#${id}`).evaluate((element) => ({
+      classes: [...element.classList],
+      opacity: Number.parseFloat(getComputedStyle(element).opacity),
+    })).catch(() => ({ classes: [], opacity: null }));
+    throw new Error(`Timed out waiting for ${description}; observed ${JSON.stringify(observed)}.`, { cause });
+  }
+}
+
 try {
   fs.mkdirSync(screenshotRoot, { recursive: true });
   const chromiumPackage = path.join(root, 'node_modules/@sparticuz/chromium/bin/al2023.tar.br');
@@ -159,6 +177,30 @@ try {
     }
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  // Confirm prerendered tool content is styled and readable even before client hydration.
+  const prerenderContext = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 1440, height: 980 },
+  });
+  const prerenderPage = await prerenderContext.newPage();
+  const prerenderResponse = await prerenderPage.goto(`${baseURL}/tools/pdf-merger/`, { waitUntil: 'networkidle' });
+  assert.equal(prerenderResponse?.status(), 200, 'The prerendered tool route should load without JavaScript.');
+  assert.match(await prerenderPage.locator('main').innerText(), /Combine multiple PDF files into one document/);
+  const prerenderStyles = await prerenderPage.locator('main.mx-auto').evaluate((main) => {
+    const heading = main.querySelector('h1');
+    return {
+      maxWidth: getComputedStyle(main).maxWidth,
+      marginLeft: getComputedStyle(main).marginLeft,
+      paddingTop: getComputedStyle(main).paddingTop,
+      headingFontSize: heading ? getComputedStyle(heading).fontSize : '',
+    };
+  });
+  assert.equal(prerenderStyles.maxWidth, '1152px', 'Prerendered content should receive its max-width utility before hydration.');
+  assert.equal(prerenderStyles.marginLeft, '144px', 'Prerendered content should be centered before hydration.');
+  assert.equal(prerenderStyles.paddingTop, '40px', 'Responsive prerender spacing should apply before hydration.');
+  assert.equal(prerenderStyles.headingFontSize, '36px', 'Responsive heading styles should apply before hydration.');
+  console.log('[ui] prerendered tool content and responsive Tailwind styles render without JavaScript');
 
   // Browse the actual production build at all requested sizes and at two wider desktop widths.
   for (const width of viewports) {
@@ -212,13 +254,20 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
   const classicSection = page.locator('#classic-tools');
-  await page.waitForFunction(() => document.getElementById('classic-tools')?.classList.contains('hub-reveal-pending'));
-  assert.ok(Number.parseFloat(await classicSection.evaluate((element) => getComputedStyle(element).opacity)) < 0.05, 'A below-fold section should begin in its pending reveal state.');
+  await waitForRevealOpacity(page, {
+    id: 'classic-tools',
+    state: 'pending',
+    threshold: 0.05,
+    description: 'the below-fold section to settle into its pending opacity',
+  });
+  assert.ok(Number.parseFloat(await classicSection.evaluate((element) => getComputedStyle(element).opacity)) < 0.05, 'A below-fold section should begin in its settled pending reveal state.');
   await classicSection.scrollIntoViewIfNeeded();
-  await page.waitForFunction(() => {
-    const element = document.getElementById('classic-tools');
-    return element?.classList.contains('hub-revealed') && Number.parseFloat(getComputedStyle(element).opacity) > 0.99;
-  }, null, { timeout: 5_000 });
+  await waitForRevealOpacity(page, {
+    id: 'classic-tools',
+    state: 'revealed',
+    threshold: 0.99,
+    description: 'the section to settle into its revealed opacity after scrolling',
+  });
   await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
   const menuButton = page.locator('[data-site-menu-toggle="true"]');
   await menuButton.focus();
@@ -255,10 +304,23 @@ try {
       const classicLink = page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Classic utilities' });
       await classicLink.focus();
       await classicLink.press('Enter');
-      await page.waitForFunction(() => {
-        const top = document.getElementById('classic-tools')?.getBoundingClientRect().top ?? Infinity;
-        return window.location.hash === '#classic-tools' && document.activeElement?.id === 'classic-tools' && top >= 0 && top < 200;
-      });
+      try {
+        await page.waitForFunction(() => {
+          const top = document.getElementById('classic-tools')?.getBoundingClientRect().top ?? Infinity;
+          return window.location.hash === '#classic-tools' && document.activeElement?.id === 'classic-tools' && top >= 0 && top < 200;
+        }, null, { timeout: 5_000 });
+      } catch (cause) {
+        const observed = await page.evaluate(() => {
+          const target = document.getElementById('classic-tools');
+          return {
+            hash: window.location.hash,
+            activeElement: document.activeElement?.outerHTML.slice(0, 160) ?? null,
+            targetTop: target?.getBoundingClientRect().top ?? null,
+            scrollY: window.scrollY,
+          };
+        });
+        throw new Error(`Keyboard section navigation failed on ${route} (repeat ${repeat + 1}): ${JSON.stringify(observed)}.`, { cause });
+      }
       assert.equal(await menuButton.getAttribute('aria-expanded'), 'false', 'Navigation should close the mobile disclosure.');
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('href')), '/word-counter/', 'Tab after section navigation should reach the first destination link.');

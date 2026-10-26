@@ -96,9 +96,12 @@ export function SiteHeader({ variant, privacy }: SiteHeaderProps) {
             () => {
               closeMenu();
               if (isHome) {
+                const isRepeatedFragment = window.location.hash === `#${item.id}`;
                 window.requestAnimationFrame(() => {
                   const target = document.getElementById(item.id);
-                  if (target) focusFragmentTarget(target);
+                  if (!target) return;
+                  focusFragmentTarget(target);
+                  target.scrollIntoView({ block: 'start', behavior: isRepeatedFragment ? 'instant' : 'auto' });
                 });
               }
             },
