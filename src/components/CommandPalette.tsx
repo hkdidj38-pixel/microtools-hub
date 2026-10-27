@@ -133,6 +133,7 @@ export function CommandPalette({
       }}
     >
       <div
+        role="presentation"
         className="flex min-h-full items-start justify-center px-4 pb-4 pt-[12vh]"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) {

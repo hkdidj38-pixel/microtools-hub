@@ -477,7 +477,13 @@ export function computeLineDiff(input: string): TransformOutcome {
 
   // Include each line's terminator in the comparison so newline-only changes
   // survive export, and an empty block represents zero lines.
-  const splitLines = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const splitLines = (text: string): string[] => {
+    const lines = text.split('\n');
+    return lines.flatMap((line, index) => {
+      if (index < lines.length - 1) return [`${line}\n`];
+      return line ? [line] : [];
+    });
+  };
   const left = splitLines(input.slice(0, separator.index));
   const right = splitLines(input.slice(separator.index + separator[0].length));
 
