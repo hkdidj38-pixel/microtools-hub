@@ -271,12 +271,18 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
   context.request.signal.addEventListener('abort', cancel, { once: true });
   const timeoutId = setTimeout(expire, FETCH_TIMEOUT_MS);
   const withinDeadline = <T>(work: Promise<T>): Promise<T> => Promise.race([work, deadline]);
+  const throwIfInterrupted = (response?: Response): void => {
+    if (!interruption) return;
+    if (response) cancelBody(response);
+    throw new Error(interruption);
+  };
   let upstreamResponse: Response | null = null;
   let finalTarget = target;
   const visited = new Set<string>();
 
   try {
     for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+      throwIfInterrupted();
       if (visited.has(finalTarget.href)) {
         return jsonResponse({ success: false, error: 'The target returned a redirect loop.' }, 502);
       }
@@ -292,8 +298,11 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
         if (controller.signal.aborted) cancelBody(result);
         return result;
       }));
+      // A settled race cannot reject if interruption arrives before this continuation.
+      throwIfInterrupted(response);
       if (response.status === 429 || response.status === 503) {
         cancelBody(response);
+        throwIfInterrupted();
         return jsonResponse({ success: false, error: 'Inspection is temporarily unavailable or rate limited.' }, response.status);
       }
 
@@ -301,6 +310,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       if (REDIRECT_STATUSES.has(response.status) && location) {
         if (redirectCount === MAX_REDIRECTS) {
           cancelBody(response);
+          throwIfInterrupted();
           return jsonResponse({ success: false, error: 'The target redirected too many times.' }, 502);
         }
         try {
@@ -308,6 +318,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
           if (!hosts.has(finalTarget.hostname)) throw new InvalidTargetError('Unapproved redirect');
         } catch {
           cancelBody(response);
+          throwIfInterrupted();
           return jsonResponse({ success: false, error: 'The target redirected to a blocked URL.' }, 502);
         }
         cancelBody(response);
@@ -334,6 +345,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       cancelBody(upstreamResponse);
     }
 
+    throwIfInterrupted();
     const edge = context.request.cf;
     const userAgent = (context.request.headers.get('user-agent') || 'Unknown').slice(0, 200);
     return jsonResponse({
