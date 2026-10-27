@@ -42,6 +42,8 @@ test('metadata parser accepts literals without executing TypeScript', () => {
 
 test('metadata parser rejects executable syntax, imports and duplicate keys', () => {
   const invalidSources = [
+    `export let meta = { name: 'mutable', description: 'x' };`,
+    `export var meta = { name: 'mutable', description: 'x' };`,
     `export const meta = { name: (() => { throw Error('executed'); })(), description: 'x' };`,
     `export const meta = { name: 'x', description: 'x', ...other };`,
     `export const meta = { name: 'x', description: 'x', [run()]: true };`,

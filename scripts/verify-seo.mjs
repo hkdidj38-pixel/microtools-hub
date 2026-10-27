@@ -10,7 +10,16 @@ const rawSiteUrl =
     ? process.env.SITE_URL.trim()
     : 'https://microtools-hub-d6l.pages.dev';
 const parsedSiteUrl = new URL(rawSiteUrl);
-const SITE_ORIGIN = `${parsedSiteUrl.origin}${parsedSiteUrl.pathname.replace(/\/+$/, '')}`;
+assert.ok(
+  ['http:', 'https:'].includes(parsedSiteUrl.protocol) &&
+    parsedSiteUrl.pathname === '/' &&
+    !parsedSiteUrl.username &&
+    !parsedSiteUrl.password &&
+    !parsedSiteUrl.search &&
+    !parsedSiteUrl.hash,
+  'Invalid SITE_URL: expected an HTTP(S) origin without credentials, path prefix, query, or hash',
+);
+const SITE_ORIGIN = parsedSiteUrl.origin;
 
 function extractAll(html, regex) {
   return [...html.matchAll(regex)].map((m) => m[1]);
