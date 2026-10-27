@@ -15,7 +15,7 @@ export function parseToolMetadata(source, filename = 'meta.ts') {
     file.statements.length !== 1 ||
     !ts.isVariableStatement(statement) ||
     !statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ||
-    (statement.declarationList.flags & ts.NodeFlags.Const) === 0 ||
+    statement.declarationList.getFirstToken(file)?.kind !== ts.SyntaxKind.ConstKeyword ||
     statement.declarationList.declarations.length !== 1
   ) {
     fail('meta.ts must contain only an exported const meta literal (zero imports or executable statements)');
