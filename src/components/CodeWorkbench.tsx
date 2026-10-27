@@ -6,6 +6,7 @@ import {
   Copy,
   Download,
   FileCode2,
+  HardDrive,
   Sparkles,
   Trash2,
   Upload,
@@ -16,6 +17,11 @@ import { emitLocalActivityPulse } from '@/lib/storage';
 export interface WorkbenchOption {
   id: string;
   label: string;
+}
+
+export interface BinaryFileSummary {
+  name: string;
+  byteLength: number;
 }
 
 interface CodeWorkbenchProps {
@@ -35,6 +41,10 @@ interface CodeWorkbenchProps {
   extraControls?: React.ReactNode;
   onSwapCustom?: () => void;
   statusDetail?: string;
+  onBinaryFileUpload?: (file: File, bytes: Uint8Array) => void;
+  binaryFileSummary?: BinaryFileSummary | null;
+  onClearBinaryFile?: () => void;
+  maxUploadBytes?: number;
 }
 
 function byteLength(text: string): number {
@@ -63,6 +73,10 @@ export function CodeWorkbench({
   extraControls,
   onSwapCustom,
   statusDetail,
+  onBinaryFileUpload,
+  binaryFileSummary = null,
+  onClearBinaryFile,
+  maxUploadBytes = 5 * 1024 * 1024,
 }: CodeWorkbenchProps) {
   const [wrap, setWrap] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -73,24 +87,36 @@ export function CodeWorkbench({
   const inputGutterRef = useRef<HTMLDivElement>(null);
   const outputGutterRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editVersionRef = useRef(0);
 
   const inputLines = useMemo(() => Math.min(Math.max(countLines(input), 12), 600), [input]);
   const outputLines = useMemo(() => Math.min(Math.max(countLines(output), 12), 600), [output]);
-  const inputBytes = useMemo(() => byteLength(input), [input]);
+  const inputBytes = useMemo(
+    () => (binaryFileSummary ? binaryFileSummary.byteLength : byteLength(input)),
+    [binaryFileSummary, input],
+  );
   const outputBytes = useMemo(() => byteLength(output), [output]);
 
   const updateInput = (value: string) => {
+    editVersionRef.current += 1;
     setClipboardError(null);
+    onClearBinaryFile?.();
     emitLocalActivityPulse();
     onInputChange(value);
   };
 
   const handlePaste = async () => {
+    const pasteToken = ++editVersionRef.current;
     try {
       const text = await navigator.clipboard.readText();
-      updateInput(text);
+      if (pasteToken !== editVersionRef.current) return;
+      setClipboardError(null);
+      onClearBinaryFile?.();
+      emitLocalActivityPulse();
+      onInputChange(text);
       inputTextareaRef.current?.focus();
     } catch {
+      if (pasteToken !== editVersionRef.current) return;
       setClipboardError('Clipboard read requires browser permission — press Ctrl/Cmd+V inside the editor.');
       inputTextareaRef.current?.focus();
     }
@@ -122,15 +148,37 @@ export function CodeWorkbench({
 
   const handleFileUpload = async (file: File | undefined) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setClipboardError('Text file exceeds the 5 MiB editor limit.');
+    if (file.size > maxUploadBytes) {
+      const limitMiB = Math.round(maxUploadBytes / (1024 * 1024));
+      setClipboardError(`File exceeds the ${limitMiB} MiB limit.`);
       return;
     }
-    const text = await file.text();
-    updateInput(text);
+
+    const uploadToken = ++editVersionRef.current;
+    try {
+      if (onBinaryFileUpload) {
+        const buffer = await file.arrayBuffer();
+        if (uploadToken !== editVersionRef.current) return;
+        setClipboardError(null);
+        emitLocalActivityPulse();
+        onBinaryFileUpload(file, new Uint8Array(buffer));
+        return;
+      }
+
+      const text = await file.text();
+      if (uploadToken !== editVersionRef.current) return;
+      setClipboardError(null);
+      emitLocalActivityPulse();
+      onInputChange(text);
+    } catch {
+      if (uploadToken !== editVersionRef.current) return;
+      setClipboardError('Could not read the selected local file.');
+    }
   };
 
   const handleSwap = () => {
+    editVersionRef.current += 1;
+    onClearBinaryFile?.();
     emitLocalActivityPulse();
     if (onSwapCustom) {
       onSwapCustom();
@@ -140,6 +188,8 @@ export function CodeWorkbench({
       onInputChange(output);
     }
   };
+
+  const hasInputContent = Boolean(input || binaryFileSummary);
 
   return (
     <div className="space-y-3">
@@ -216,6 +266,7 @@ export function CodeWorkbench({
               <input
                 ref={fileInputRef}
                 type="file"
+                aria-label="Upload input file"
                 className="sr-only"
                 tabIndex={-1}
                 onChange={(event) => {
@@ -248,7 +299,7 @@ export function CodeWorkbench({
               </button>
               <button
                 type="button"
-                disabled={!input}
+                disabled={!hasInputContent}
                 onClick={() => {
                   updateInput('');
                   inputTextareaRef.current?.focus();
@@ -284,13 +335,40 @@ export function CodeWorkbench({
                     inputGutterRef.current.scrollTop = event.currentTarget.scrollTop;
                   }
                 }}
-                placeholder={input ? inputPlaceholder : ''}
+                placeholder={hasInputContent ? inputPlaceholder : ''}
                 spellCheck={false}
                 className="h-full min-h-[19rem] w-full resize-y border-0 bg-transparent p-3 font-mono text-xs leading-6 text-ink placeholder:text-muted-subtle focus:outline-none sm:text-[13px]"
               />
 
+              {/* Raw Byte File Checksum Overlay (when binaryFileSummary is active) */}
+              {binaryFileSummary && (
+                <div
+                  className="pointer-events-none absolute inset-3 flex flex-col items-center justify-center rounded-hub-input border border-brand/40 bg-surface/95 p-4 text-center"
+                  role="status"
+                >
+                  <HardDrive className="h-6 w-6 text-brand" aria-hidden="true" />
+                  <p className="mt-2 max-w-full truncate font-mono text-xs font-semibold text-ink">
+                    {binaryFileSummary.name}
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-muted">
+                    {binaryFileSummary.byteLength.toLocaleString()} raw bytes loaded via ArrayBuffer (exact binary &amp; BOM preserved)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      updateInput('');
+                      inputTextareaRef.current?.focus();
+                    }}
+                    className="hub-button-secondary pointer-events-auto mt-3 min-h-8 px-3 py-1 font-mono text-xs"
+                  >
+                    Switch to Text Input
+                  </button>
+                </div>
+              )}
+
               {/* Dotted Empty State Overlay */}
-              {!input && (
+              {!hasInputContent && (
                 <div
                   onClick={() => inputTextareaRef.current?.focus()}
                   className="pointer-events-none absolute inset-3 flex flex-col items-center justify-center rounded-hub-input border border-dashed border-line bg-surface/40 p-4 text-center"
@@ -433,7 +511,8 @@ export function CodeWorkbench({
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>
-            IN: <strong className="font-medium text-ink">{inputBytes.toLocaleString()} B</strong> ({countLines(input)} ln)
+            IN: <strong className="font-medium text-ink">{inputBytes.toLocaleString()} B</strong>{' '}
+            {binaryFileSummary ? '(raw file)' : `(${countLines(input)} ln)`}
           </span>
           <span aria-hidden="true" className="text-line">|</span>
           <span>

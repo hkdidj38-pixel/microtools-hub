@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash, webcrypto } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import test from 'node:test';
@@ -156,13 +158,91 @@ test('Regex evaluator, timestamp converter, case transformer, diff, and word met
   assert.equal(slug.output, 'creme-brulee-cafe');
 
   const diff = logic.computeLineDiff('alpha\nbeta\n===\nalpha\ngamma');
-  assert.match(diff.output, /- beta/);
-  assert.match(diff.output, /\+ gamma/);
+  assert.match(diff.output, /^--- a\/original\n\+\+\+ b\/modified\n@@ -1,2 \+1,2 @@/m);
+  assert.match(diff.output, /\n-beta\n\+gamma\n/);
 
   const metrics = logic.analyzeTextMetrics('Hello world café');
   const metricsJson = JSON.parse(metrics.output);
   assert.equal(metricsJson.words, 3);
   assert.ok(metricsJson.utf8_bytes > metricsJson.characters);
+});
+
+test('PR #39 regressions: Unicode regex lastIndex, astral HTML entities, full named entities, URL prototype safety, raw byte SHA, component + decode, astral char count, and git-apply unified diff', async () => {
+  // Issue 1: zero-length regex with u/v flags advances across surrogate pairs cleanly
+  const emptyUnicode = logic.evaluateRegex('(?:)', 'gu', '😀');
+  assert.equal(emptyUnicode.error, null);
+  const unicodeMatches = JSON.parse(emptyUnicode.output);
+  assert.equal(unicodeMatches.length, 2);
+  assert.deepEqual(
+    unicodeMatches.map((m) => m.index),
+    [0, 2],
+  );
+
+  // Issue 2: astral emoji encodes as single supplementary code point entity &#x1F600;
+  const emojiEncoded = logic.transformHtmlEntities('Deploy 😀 <ok>', 'encode');
+  assert.equal(emojiEncoded.error, null);
+  assert.equal(emojiEncoded.output, 'Deploy &#x1F600; &lt;ok&gt;');
+  assert.equal(logic.transformHtmlEntities(emojiEncoded.output, 'decode').output, 'Deploy 😀 <ok>');
+
+  // Issue 3: common HTML4/HTML5 named entities decode accurately & unknown names surface in detail
+  const namedDecoded = logic.transformHtmlEntities(
+    'Caf&eacute; &mdash; &hellip; &trade; &euro; &alpha; &rarr; &spades;',
+    'decode',
+  );
+  assert.equal(namedDecoded.output, 'Café — … ™ € α → ♠');
+  assert.equal(namedDecoded.detail, 'Entities unescaped to UTF-8');
+
+  const unknownNamed = logic.transformHtmlEntities('hello &notarealentity; &eacute;', 'decode');
+  assert.equal(unknownNamed.output, 'hello &notarealentity; é');
+  assert.match(unknownNamed.detail ?? '', /unrecognized entity ref \(&notarealentity;\)/);
+
+  // Issue 4: URL query parser handles Object.prototype property names safely
+  const protoUrl = logic.transformUrl(
+    'https://api.example.dev/check?constructor=val1&toString=a&toString=b&__proto__=safe',
+    'parse',
+  );
+  assert.equal(protoUrl.error, null);
+  const parsedUrl = JSON.parse(protoUrl.output);
+  assert.equal(parsedUrl.query.constructor, 'val1');
+  assert.deepEqual(parsedUrl.query.toString, ['a', 'b']);
+  assert.equal(parsedUrl.query.__proto__, 'safe');
+  assert.equal(({}).polluted, undefined);
+
+  // Issue 6: computeByteHashes digests exact raw bytes (BOM + null + high bytes) without UTF-8 coercion
+  const rawBytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x00, 0xff, 0xfe, 0x61]);
+  const expectedRawSha256 = createHash('sha256').update(Buffer.from(rawBytes)).digest('hex');
+  const rawDigestRes = await logic.computeByteHashes(rawBytes, 'hex', 'fixture.bin');
+  assert.equal(rawDigestRes.error, null);
+  assert.ok(rawDigestRes.output.includes(expectedRawSha256));
+  assert.match(rawDigestRes.detail ?? '', /fixture\.bin \(7 raw bytes\)/);
+
+  // Issue 7: URL Decode Component preserves literal '+' characters
+  const decodedComponent = logic.transformUrl('a+b%2Bc%20d', 'decode');
+  assert.equal(decodedComponent.error, null);
+  assert.equal(decodedComponent.output, 'a+b+c d');
+
+  // Issue 9: analyzeTextMetrics counts supplementary code points consistently with/without whitespace
+  const emojiMetrics = JSON.parse(logic.analyzeTextMetrics('😀 a 😀').output);
+  assert.equal(emojiMetrics.characters, 5);
+  assert.equal(emojiMetrics.characters_no_whitespace, 3);
+
+  // Issue 14: computeLineDiff produces standard unified diffs accepted by `git apply --check`
+  const origLines = ['line1', 'line2', 'timeout: 3000', 'line4', 'line5', 'line6', 'line7', 'old: true', 'line9'].join('\n');
+  const modLines = ['line1', 'line2', 'timeout: 8000', 'line4', 'line5', 'line6', 'line7', 'old: false', 'added: 1', 'line9'].join('\n');
+  const patchRes = logic.computeLineDiff(`${origLines}\n===\n${modLines}`);
+  assert.equal(patchRes.error, null);
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-diff-'));
+  try {
+    const patchContent = patchRes.output
+      .replace('--- a/original', '--- a/sample.txt')
+      .replace('+++ b/modified', '+++ b/sample.txt');
+    fs.writeFileSync(path.join(tmpDir, 'sample.txt'), `${origLines}\n`, 'utf8');
+    fs.writeFileSync(path.join(tmpDir, 'changes.diff'), patchContent, 'utf8');
+    execFileSync('git', ['apply', '--check', 'changes.diff'], { cwd: tmpDir, stdio: 'pipe' });
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('All 16 tool meta.ts files have zero imports and complete metadata', () => {
@@ -196,4 +276,13 @@ test('All 16 tool meta.ts files have zero imports and complete metadata', () => 
 
   assert.equal(localCount, 15);
   assert.equal(edgeCount, 1);
+
+  // Issue 13: Client SEO components must derive SITE_ORIGIN from shared siteConfig (SITE_URL) rather than hardcoding pages.dev
+  const appSrc = fs.readFileSync(path.resolve('src/App.tsx'), 'utf8');
+  const layoutSrc = fs.readFileSync(path.resolve('src/components/ToolLayout.tsx'), 'utf8');
+  const viteSrc = fs.readFileSync(path.resolve('vite.config.ts'), 'utf8');
+  assert.ok(!appSrc.includes('microtools-hub-d6l.pages.dev'), 'App.tsx must use SITE_ORIGIN rather than hardcoding pages.dev');
+  assert.ok(!layoutSrc.includes('microtools-hub-d6l.pages.dev'), 'ToolLayout.tsx must use SITE_ORIGIN rather than hardcoding pages.dev');
+  assert.match(viteSrc, /__SITE_ORIGIN__/);
+  assert.match(viteSrc, /process\.env\.SITE_URL/);
 });

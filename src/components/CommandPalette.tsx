@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Command } from 'cmdk';
 import Fuse from 'fuse.js';
 import { useNavigate } from 'react-router-dom';
@@ -10,22 +10,42 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   favorites: string[];
   recents: string[];
+  returnFocusRef?: React.MutableRefObject<HTMLElement | null>;
+  shellRef?: React.RefObject<HTMLDivElement | null>;
 }
+
+const FOCUSABLE_SELECTOR =
+  'input:not([disabled]), button:not([disabled]), [href], select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function CommandPalette({
   open,
   onOpenChange,
   favorites,
   recents,
+  returnFocusRef,
+  shellRef,
 }: CommandPaletteProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const dialogContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const internalPreviousFocusRef = useRef<HTMLElement | null>(null);
+  const didNavigateRef = useRef(false);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        onOpenChange(!open);
+        if (!open) {
+          const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          internalPreviousFocusRef.current = active;
+          if (returnFocusRef) returnFocusRef.current = active;
+          didNavigateRef.current = false;
+          onOpenChange(true);
+        } else {
+          onOpenChange(false);
+        }
       } else if (event.key === 'Escape' && open) {
         event.preventDefault();
         onOpenChange(false);
@@ -33,11 +53,46 @@ export function CommandPalette({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, returnFocusRef]);
 
-  useEffect(() => {
-    if (!open) setQuery('');
-  }, [open]);
+  useLayoutEffect(() => {
+    const shell = shellRef?.current;
+    if (open) {
+      wasOpenRef.current = true;
+      didNavigateRef.current = false;
+      if (shell) {
+        shell.inert = true;
+        shell.setAttribute('aria-hidden', 'true');
+      }
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      inputRef.current?.focus();
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        if (shell) {
+          shell.inert = false;
+          shell.removeAttribute('aria-hidden');
+        }
+      };
+    }
+
+    if (shell) {
+      shell.inert = false;
+      shell.removeAttribute('aria-hidden');
+    }
+    setQuery('');
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      if (!didNavigateRef.current) {
+        const target = returnFocusRef?.current ?? internalPreviousFocusRef.current;
+        if (target && target.isConnected) {
+          target.focus();
+        }
+      }
+      didNavigateRef.current = false;
+    }
+    return undefined;
+  }, [open, returnFocusRef, shellRef]);
 
   const fuse = useMemo(
     () =>
@@ -82,12 +137,44 @@ export function CommandPalette({
   if (!open) return null;
 
   const handleSelect = (slug: string) => {
+    didNavigateRef.current = true;
     onOpenChange(false);
     navigate(`/tools/${slug}`);
   };
 
+  const handleTrapKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab') return;
+    const container = dialogContainerRef.current;
+    if (!container) return;
+
+    const focusables = Array.from(
+      container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+
+    if (focusables.length === 0) {
+      event.preventDefault();
+      return;
+    }
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    if (event.shiftKey) {
+      if (!active || !container.contains(active) || active === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (!active || !container.contains(active) || active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
+      ref={dialogContainerRef}
+      onKeyDown={handleTrapKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 px-4 pt-[12vh] backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
@@ -101,6 +188,7 @@ export function CommandPalette({
           <div className="flex items-center gap-3 border-b border-line bg-paper px-3.5">
             <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
             <Command.Input
+              ref={inputRef}
               autoFocus
               value={query}
               onValueChange={setQuery}
@@ -110,6 +198,7 @@ export function CommandPalette({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
+              aria-label="Close command palette"
               className="rounded-[6px] border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px] text-muted hover:text-ink"
             >
               ESC
