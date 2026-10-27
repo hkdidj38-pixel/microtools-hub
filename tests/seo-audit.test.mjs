@@ -25,23 +25,31 @@ function loadAllToolMetas() {
   const toolsRoot = path.resolve('src/tools');
   return fs
     .readdirSync(toolsRoot, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !d.name.startsWith('_'))
+    .filter(
+      (d) =>
+        d.isDirectory() &&
+        !d.name.startsWith('_') &&
+        fs.existsSync(path.join(toolsRoot, d.name, 'index.tsx')) &&
+        fs.existsSync(path.join(toolsRoot, d.name, 'meta.ts')),
+    )
     .map((d) => {
       const raw = fs.readFileSync(path.join(toolsRoot, d.name, 'meta.ts'), 'utf8');
       const runnable = raw.replace(/export\s+const\s+meta\s*(?::[^=]+)?=\s*/, 'const meta = ').concat('\n;meta;');
-      return vm.runInNewContext(runnable, {}, { timeout: 1000 });
+      const meta = vm.runInNewContext(runnable, {}, { timeout: 1000 });
+      return { ...meta, slug: meta.slug || d.name };
     });
 }
 
 test('SEO metadata and JSON-LD builders emit unique titles/descriptions and zero fake ratings or reviews', () => {
   const seo = loadSeoModule();
   const metas = loadAllToolMetas();
-  assert.equal(metas.length, 16);
+  assert.ok(metas.length > 0, 'Expected at least one discovered tool in src/tools');
 
   const titles = new Set([seo.HOME_TITLE]);
   const descriptions = new Set([seo.HOME_DESCRIPTION]);
 
   const homeJsonLd = seo.buildHomeJsonLd(metas, 'https://microtools-hub-d6l.pages.dev');
+  assert.equal(homeJsonLd['@graph'][1].itemListElement.length, metas.length);
   const homeRaw = JSON.stringify(homeJsonLd);
   assert.match(homeRaw, /"@type":"WebSite"/);
   assert.match(homeRaw, /"@type":"ItemList"/);

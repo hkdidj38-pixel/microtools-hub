@@ -405,7 +405,7 @@ for (const [legacySlug, targetToolSlug] of Object.entries(legacyCanonicalTargets
   fs.writeFileSync(distLegacyHtmlPath, updatedLegacyHtml, 'utf8');
 }
 
-/* Emit canonical-only XML sitemap (17 indexable routes: / + 16 /tools/<slug>) */
+/* Emit canonical-only XML sitemap (/ + all discovered /tools/<slug> routes) */
 const uniqueSitemapUrls = [...new Set(sitemapUrls)];
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${uniqueSitemapUrls
   .map((url) => `  <url><loc>${xmlEsc(url)}</loc></url>`)

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 
 const distDir = path.resolve('dist');
+const toolsRoot = path.resolve('src/tools');
 const rawSiteUrl = process.env.SITE_URL && process.env.SITE_URL.trim()
   ? process.env.SITE_URL.trim()
   : 'https://microtools-hub-d6l.pages.dev';
@@ -19,20 +21,35 @@ function assertSingleTag(html, regex, label, route) {
   return matches[0];
 }
 
-const toolDirs = fs
-  .readdirSync(path.resolve('src/tools'), { withFileTypes: true })
-  .filter((d) => d.isDirectory() && !d.name.startsWith('_'))
-  .map((d) => d.name)
-  .sort();
+function discoverToolSlugs() {
+  return fs
+    .readdirSync(toolsRoot, { withFileTypes: true })
+    .filter(
+      (d) =>
+        d.isDirectory() &&
+        !d.name.startsWith('_') &&
+        fs.existsSync(path.join(toolsRoot, d.name, 'index.tsx')) &&
+        fs.existsSync(path.join(toolsRoot, d.name, 'meta.ts')),
+    )
+    .map((d) => d.name)
+    .sort()
+    .map((folder) => {
+      const raw = fs.readFileSync(path.join(toolsRoot, folder, 'meta.ts'), 'utf8');
+      const runnable = raw.replace(/export\s+const\s+meta\s*(?::[^=]+)?=\s*/, 'const meta = ').concat('\n;meta;');
+      const meta = vm.runInNewContext(runnable, {}, { timeout: 1000 });
+      return meta?.slug || folder;
+    });
+}
 
-assert.equal(toolDirs.length, 16, `Expected 16 tools, found ${toolDirs.length}`);
+const toolSlugs = discoverToolSlugs();
+assert.ok(toolSlugs.length > 0, 'Expected at least one discovered tool in src/tools');
 
 const canonicalRoutes = [
   { route: '/', file: path.join(distDir, 'index.html'), expectedCanonical: `${SITE_ORIGIN}/` },
-  ...toolDirs.map((slug) => ({
+  ...toolSlugs.map((slug) => ({
     route: `/tools/${slug}`,
     file: path.join(distDir, 'tools', slug, 'index.html'),
-    expectedCanonical: `${SITE_ORIGIN}/tools/${slug}`,
+    expectedCanonical: `${SITE_ORIGIN}/tools/${encodeURIComponent(slug)}`,
   })),
 ];
 
@@ -176,11 +193,15 @@ for (const [legacySlug, targetSlug] of legacyPairs) {
 assert.ok(fs.existsSync(path.join(distDir, 'googlecca6cea465225adc.html')), 'Google Search Console HTML verification file missing in dist/');
 assert.match(fs.readFileSync(path.join(distDir, 'index.html'), 'utf8'), /name="google-site-verification"/);
 
-// Verify sitemap.xml contains exclusively the 17 canonical URLs and matches robots.txt
+// Verify sitemap.xml contains exclusively the discovered canonical URLs and matches robots.txt
 const sitemapXml = fs.readFileSync(path.join(distDir, 'sitemap.xml'), 'utf8');
 const sitemapLocs = extractAll(sitemapXml, /<loc>([^<]+)<\/loc>/g);
 const expectedLocs = canonicalRoutes.map((r) => r.expectedCanonical);
-assert.deepEqual(sitemapLocs, expectedLocs, 'sitemap.xml must list exact 17 canonical URLs with zero duplicates or non-canonical pages');
+assert.deepEqual(
+  sitemapLocs,
+  expectedLocs,
+  `sitemap.xml must list exact ${expectedLocs.length} canonical URLs with zero duplicates or non-canonical pages`,
+);
 
 const robotsTxt = fs.readFileSync(path.join(distDir, 'robots.txt'), 'utf8');
 assert.match(robotsTxt, /^User-agent:\s*\*/m);
