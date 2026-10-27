@@ -16,14 +16,19 @@ function resolveSiteOrigin(raw = process.env.SITE_URL): string {
       `Invalid SITE_URL "${input}": expected an absolute http(s) URL such as https://microtools-hub-d6l.pages.dev`,
     );
   }
+  if (parsed.username || parsed.password) {
+    throw new Error('Invalid SITE_URL: must not contain credentials');
+  }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     throw new Error(`Invalid SITE_URL "${input}": protocol must be http: or https:`);
   }
   if (parsed.search || parsed.hash) {
     throw new Error(`Invalid SITE_URL "${input}": must not contain query parameters or hash fragments`);
   }
-  const cleanPath = parsed.pathname.replace(/\/+$/, '');
-  return `${parsed.origin}${cleanPath}`;
+  if (parsed.pathname !== '/') {
+    throw new Error(`Invalid SITE_URL "${input}": subdirectory deployments are not supported; use a site origin`);
+  }
+  return parsed.origin;
 }
 
 function globMatches(pattern: string, pathname: string): boolean {
@@ -83,7 +88,18 @@ function cloudflarePagesPreviewPlugin(): Plugin {
 
       // Apply _headers rules before static asset dispatch
       server.middlewares.use((req, res, next) => {
-        const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+        let pathname: string;
+        try {
+          pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+          // Reject invalid encodings before Vite's HTML fallback decodes the URL.
+          decodeURIComponent(pathname);
+        } catch {
+          res.statusCode = 400;
+          res.setHeader('content-type', 'text/plain; charset=utf-8');
+          res.setHeader('x-robots-tag', 'noindex, nofollow');
+          res.end(req.method === 'HEAD' ? undefined : 'Bad Request');
+          return;
+        }
         for (const [name, value] of getHeaders(pathname)) {
           res.setHeader(name, value);
         }

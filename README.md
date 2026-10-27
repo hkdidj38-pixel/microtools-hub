@@ -49,7 +49,7 @@ This runs TypeScript checks, creates a Vite static build in `dist/`, pre-renders
 
 Create the following files under `src/tools/<slug>/`:
 
-- `meta.ts` — a plain `export const meta = { ... }` object with no imports or TypeScript annotations; prerendering evaluates this file directly in Node.
+- `meta.ts` — a plain `export const meta = { ... }` object with literal values. Build scripts parse this file without executing it; imports, calls, spreads, getters, and other executable expressions are rejected.
 - `logic.ts` — client-side functionality.
 - `index.tsx` — React interface.
 

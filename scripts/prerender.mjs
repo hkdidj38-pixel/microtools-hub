@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
+import { discoverToolMetadata } from './tool-metadata.mjs';
 
 function resolveSiteUrl(raw = process.env.SITE_URL) {
   const input = raw && raw.trim() ? raw.trim() : 'https://microtools-hub-d6l.pages.dev';
@@ -13,6 +13,10 @@ function resolveSiteUrl(raw = process.env.SITE_URL) {
     );
     process.exit(1);
   }
+  if (parsed.username || parsed.password) {
+    console.error('prerender fatal: invalid SITE_URL. Credentials are not allowed.');
+    process.exit(1);
+  }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     console.error(`prerender fatal: invalid SITE_URL "${input}". Protocol must be http: or https:.`);
     process.exit(1);
@@ -21,8 +25,11 @@ function resolveSiteUrl(raw = process.env.SITE_URL) {
     console.error(`prerender fatal: invalid SITE_URL "${input}". Must not contain query or hash.`);
     process.exit(1);
   }
-  const cleanPath = parsed.pathname.replace(/\/+$/, '');
-  return `${parsed.origin}${cleanPath}`;
+  if (parsed.pathname !== '/') {
+    console.error(`prerender fatal: invalid SITE_URL "${input}". Must be an origin without a path prefix.`);
+    process.exit(1);
+  }
+  return parsed.origin;
 }
 
 const SITE_URL = resolveSiteUrl();
@@ -30,8 +37,7 @@ const HOME_TITLE = 'MicroTools Hub — Private Browser-Native Developer Utilitie
 const HOME_DESCRIPTION =
   '15+ browser-native developer utilities powered by WebCrypto, Web Workers, and verified WASM. Private local execution, zero telemetry, instant Command+K.';
 const NOT_FOUND_TITLE = '404 — Route Not Found | MicroTools Hub';
-const NOT_FOUND_DESCRIPTION =
-  'The requested route does not match any utility in the MicroTools Hub directory.';
+const NOT_FOUND_DESCRIPTION = 'The requested route does not match any utility in the MicroTools Hub directory.';
 
 const distDir = path.resolve('dist');
 const toolsDir = path.resolve('src/tools');
@@ -43,25 +49,9 @@ if (!fs.existsSync(indexHtmlPath)) {
 }
 
 const baseHtml = fs.readFileSync(indexHtmlPath, 'utf8');
-const folders = fs.existsSync(toolsDir)
-  ? fs
-      .readdirSync(toolsDir, { withFileTypes: true })
-      .filter(
-        (entry) =>
-          entry.isDirectory() &&
-          !entry.name.startsWith('_') &&
-          fs.existsSync(path.join(toolsDir, entry.name, 'index.tsx')),
-      )
-      .map((entry) => entry.name)
-      .sort()
-  : [];
 
 const esc = (value = '') =>
-  String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const xmlEsc = (value) =>
   String(value)
@@ -71,46 +61,29 @@ const xmlEsc = (value) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 
-function stripMutableSeoHead(html) {
-  return html
-    .replace(/\s*<title>[\s\S]*?<\/title>/gi, '')
-    .replace(/\s*<meta\s+name="(?:description|robots|keywords|twitter:[^"]+)"[^>]*>/gi, '')
-    .replace(/\s*<meta\s+property="og:[^"]+"[^>]*>/gi, '')
-    .replace(/\s*<link\s+rel="canonical"[^>]*>/gi, '')
-    .replace(/\s*<script[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/gi, '');
+// The checked-in template owns this slot. Do not treat regex removal of HTML
+// tags as sanitization; replace the bounded SEO region and preserve other head assets.
+const seoStartMarker = '<!-- hub-seo:start -->';
+const seoEndMarker = '<!-- hub-seo:end -->';
+const seoStart = baseHtml.indexOf(seoStartMarker);
+const seoEnd = baseHtml.indexOf(seoEndMarker);
+if (
+  seoStart < 0 ||
+  seoEnd < seoStart ||
+  baseHtml.indexOf(seoStartMarker, seoStart + seoStartMarker.length) !== -1 ||
+  baseHtml.indexOf(seoEndMarker, seoEnd + seoEndMarker.length) !== -1
+) {
+  console.error('prerender fatal: index.html must contain exactly one bounded hub-seo template slot.');
+  process.exit(1);
 }
-
-const cleanBaseHtml = stripMutableSeoHead(baseHtml);
-const parsedTools = [];
-
-for (const folder of folders) {
-  const metaFile = path.join(toolsDir, folder, 'meta.ts');
-  if (!fs.existsSync(metaFile)) continue;
-
-  const raw = fs.readFileSync(metaFile, 'utf8');
-  if (/^\s*import\s+/m.test(raw)) {
-    console.error(`prerender fatal: ${metaFile} contains an import. meta.ts must have zero imports.`);
-    process.exit(1);
-  }
-
-  const runnable = raw
-    .replace(/export\s+const\s+meta\s*(?::[^=]+)?=\s*/, 'const meta = ')
-    .concat('\n;meta;');
-  let meta;
-  try {
-    meta = vm.runInNewContext(runnable, {}, { timeout: 1000 });
-  } catch (error) {
-    console.error(`prerender fatal: could not parse ${metaFile}: ${error.message}`);
-    process.exit(1);
-  }
-
-  if (!meta || !meta.name || !meta.description) {
-    console.error(`prerender fatal: ${metaFile} must define name and description.`);
-    process.exit(1);
-  }
-
-  const slug = meta.slug || folder;
-  parsedTools.push({ ...meta, slug });
+const cleanBaseHtml =
+  baseHtml.slice(0, seoStart) + seoStartMarker + seoEndMarker + baseHtml.slice(seoEnd + seoEndMarker.length);
+let parsedTools;
+try {
+  parsedTools = discoverToolMetadata(toolsDir);
+} catch (error) {
+  console.error(`prerender fatal: ${error.message}`);
+  process.exit(1);
 }
 
 const sitemapUrls = [`${SITE_URL}/`];
@@ -285,7 +258,7 @@ for (const meta of parsedTools) {
     </div>`;
 
   const pageHtml = cleanBaseHtml
-    .replace('</head>', `${seoHead}\n  </head>`)
+    .replace(seoStartMarker, () => `${seoStartMarker}${seoHead}\n    `)
     .replace('<div id="root"></div>', `<div id="root">${staticToolContent}</div>`);
 
   const targetDir = path.join(distDir, 'tools', slug);
@@ -359,7 +332,7 @@ const homeStaticShell = `
   </div>`;
 
 const homeHtml = cleanBaseHtml
-  .replace('</head>', `${homeSeoHead}\n  </head>`)
+  .replace(seoStartMarker, () => `${seoStartMarker}${homeSeoHead}\n    `)
   .replace('<div id="root"></div>', `<div id="root">${homeStaticShell}</div>`);
 fs.writeFileSync(indexHtmlPath, homeHtml, 'utf8');
 
@@ -380,7 +353,7 @@ const notFoundShell = `
     ${buildStaticFooter()}
   </div>`;
 const notFoundHtml = cleanBaseHtml
-  .replace('</head>', `${notFoundHead}\n  </head>`)
+  .replace(seoStartMarker, () => `${seoStartMarker}${notFoundHead}\n    `)
   .replace('<div id="root"></div>', `<div id="root">${notFoundShell}</div>`);
 fs.writeFileSync(path.join(distDir, '404.html'), notFoundHtml, 'utf8');
 console.log('[prerender] Generated /404.html (noindex, nofollow)');
@@ -398,10 +371,7 @@ for (const [legacySlug, targetToolSlug] of Object.entries(legacyCanonicalTargets
   const targetCanonical = `${SITE_URL}/tools/${targetToolSlug}`;
   const updatedLegacyHtml = fs
     .readFileSync(distLegacyHtmlPath, 'utf8')
-    .replace(
-      /<link\s+rel="canonical"[^>]*>/i,
-      `<link rel="canonical" href="${esc(targetCanonical)}">`,
-    );
+    .replace(/<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${esc(targetCanonical)}">`);
   fs.writeFileSync(distLegacyHtmlPath, updatedLegacyHtml, 'utf8');
 }
 

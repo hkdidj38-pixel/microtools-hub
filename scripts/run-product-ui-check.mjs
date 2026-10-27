@@ -195,6 +195,8 @@ try {
   const homeBgNoJs = await prerenderPage.evaluate(() => getComputedStyle(document.body).backgroundColor);
   assert.equal(homeBgNoJs, 'rgb(10, 10, 11)', 'Prerendered homepage must paint forced dark #0A0A0B without JS.');
 
+  const homeJsonLdNoJs = JSON.parse(await prerenderPage.locator('#hub-jsonld').textContent());
+
   const toolNoJs = await prerenderPage.goto(`${baseURL}/tools/json-formatter/`, { waitUntil: 'networkidle' });
   assert.equal(toolNoJs?.status(), 200);
   assert.equal(
@@ -226,6 +228,35 @@ try {
   assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'index, follow');
   assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');
   assert.equal(await page.locator('script[type="application/ld+json"]').count(), 1);
+
+  assert.deepEqual(
+    JSON.parse(await page.locator('#hub-jsonld').textContent()),
+    homeJsonLdNoJs,
+    'Homepage structured data and tool order must match before and after React mounts.',
+  );
+
+  await page.getByRole('link', { name: 'JSON Formatter & Validator', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('link[rel="canonical"]')?.getAttribute('href')?.endsWith('/tools/json-formatter'),
+  );
+  const relatedLink = page.locator('section[aria-labelledby="related-tools-heading"] a[href^="/tools/"]').first();
+  const relatedRoute = await relatedLink.getAttribute('href');
+  await prerenderPage.goto(`${baseURL}${relatedRoute}`, { waitUntil: 'networkidle' });
+  const relatedTitle = await prerenderPage.title();
+  const relatedJsonLd = JSON.parse(await prerenderPage.locator('#hub-jsonld').textContent());
+  await relatedLink.click();
+  await page.waitForFunction(
+    (route) => document.querySelector('link[rel="canonical"]')?.getAttribute('href')?.endsWith(route),
+    relatedRoute,
+  );
+  assert.equal(await page.title(), relatedTitle);
+  assert.equal(await page.locator('script[type="application/ld+json"]').count(), 1);
+  assert.deepEqual(JSON.parse(await page.locator('#hub-jsonld').textContent()), relatedJsonLd);
+  await page.goBack();
+  await page.waitForFunction(() =>
+    document.querySelector('link[rel="canonical"]')?.getAttribute('href')?.endsWith('/tools/json-formatter'),
+  );
+  assert.equal(await page.title(), 'JSON Formatter & Validator - Private, Offline & Free | MicroTools Hub');
 
   await page.goto(`${baseURL}/?category=Security`, { waitUntil: 'networkidle' });
   assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');

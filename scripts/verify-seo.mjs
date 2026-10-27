@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
+import { discoverToolMetadata } from './tool-metadata.mjs';
 
 const distDir = path.resolve('dist');
 const toolsRoot = path.resolve('src/tools');
-const rawSiteUrl = process.env.SITE_URL && process.env.SITE_URL.trim()
-  ? process.env.SITE_URL.trim()
-  : 'https://microtools-hub-d6l.pages.dev';
+const rawSiteUrl =
+  process.env.SITE_URL && process.env.SITE_URL.trim()
+    ? process.env.SITE_URL.trim()
+    : 'https://microtools-hub-d6l.pages.dev';
 const parsedSiteUrl = new URL(rawSiteUrl);
 const SITE_ORIGIN = `${parsedSiteUrl.origin}${parsedSiteUrl.pathname.replace(/\/+$/, '')}`;
 
@@ -21,27 +22,7 @@ function assertSingleTag(html, regex, label, route) {
   return matches[0];
 }
 
-function discoverToolSlugs() {
-  return fs
-    .readdirSync(toolsRoot, { withFileTypes: true })
-    .filter(
-      (d) =>
-        d.isDirectory() &&
-        !d.name.startsWith('_') &&
-        fs.existsSync(path.join(toolsRoot, d.name, 'index.tsx')) &&
-        fs.existsSync(path.join(toolsRoot, d.name, 'meta.ts')),
-    )
-    .map((d) => d.name)
-    .sort()
-    .map((folder) => {
-      const raw = fs.readFileSync(path.join(toolsRoot, folder, 'meta.ts'), 'utf8');
-      const runnable = raw.replace(/export\s+const\s+meta\s*(?::[^=]+)?=\s*/, 'const meta = ').concat('\n;meta;');
-      const meta = vm.runInNewContext(runnable, {}, { timeout: 1000 });
-      return meta?.slug || folder;
-    });
-}
-
-const toolSlugs = discoverToolSlugs();
+const toolSlugs = discoverToolMetadata(toolsRoot).map((tool) => tool.slug);
 assert.ok(toolSlugs.length > 0, 'Expected at least one discovered tool in src/tools');
 
 const canonicalRoutes = [
@@ -71,7 +52,10 @@ for (const { route, file, expectedCanonical } of canonicalRoutes) {
   }
 
   const title = assertSingleTag(html, /<title>([\s\S]*?)<\/title>/gi, '<title>', route).trim();
-  assert.ok(title.length >= 25 && title.length <= 90, `${route}: title length ${title.length} outside [25, 90]: "${title}"`);
+  assert.ok(
+    title.length >= 25 && title.length <= 90,
+    `${route}: title length ${title.length} outside [25, 90]: "${title}"`,
+  );
   assert.ok(!seenTitles.has(title), `Duplicate <title> between ${seenTitles.get(title)} and ${route}: "${title}"`);
   seenTitles.set(title, route);
 
@@ -121,8 +105,10 @@ for (const { route, file, expectedCanonical } of canonicalRoutes) {
     `${route}: obsolete <meta name="keywords"> should not be emitted`,
   );
 
-  const h1Raw = assertSingleTag(html, /<h1[^>]*>([\s\S]*?)<\/h1>/gi, '<h1>', route)
-    .replace(/<[^>]+>/g, '')
+  const h1Html = assertSingleTag(html, /<h1[^>]*>([\s\S]*?)<\/h1>/gi, '<h1>', route);
+  // Extract text runs only for uniqueness checks; this is never HTML sanitization.
+  const h1Raw = extractAll(h1Html, /(?:^|>)([^<]+)/g)
+    .join('')
     .replace(/\s+/g, ' ')
     .trim();
   assert.ok(h1Raw.length >= 5, `${route}: empty or too-short <h1>`);
@@ -130,14 +116,14 @@ for (const { route, file, expectedCanonical } of canonicalRoutes) {
   seenH1s.set(h1Raw, route);
 
   // Verify single valid JSON-LD script with zero fake reviews/ratings
-  const jsonLdScripts = extractAll(
-    html,
-    /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi,
-  );
+  const jsonLdScripts = extractAll(html, /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
   assert.equal(jsonLdScripts.length, 1, `${route}: expected 1 JSON-LD script, found ${jsonLdScripts.length}`);
   const parsedJsonLd = JSON.parse(jsonLdScripts[0]);
   const rawJsonString = JSON.stringify(parsedJsonLd);
-  assert.ok(!/aggregateRating|reviewRating|"review"/i.test(rawJsonString), `${route}: JSON-LD must never include fake ratings or reviews`);
+  assert.ok(
+    !/aggregateRating|reviewRating|"review"/i.test(rawJsonString),
+    `${route}: JSON-LD must never include fake ratings or reviews`,
+  );
   assert.ok(!rawJsonString.includes('microtools-hub.pages.dev/'), `${route}: JSON-LD contains outdated non-d6l domain`);
 
   // Verify internal links do not use trailing slashes on /tools/<slug>
@@ -156,14 +142,30 @@ const notFoundPath = path.join(distDir, '404.html');
 assert.ok(fs.existsSync(notFoundPath), 'dist/404.html must exist for Cloudflare Pages true-404 handling');
 const notFoundHtml = fs.readFileSync(notFoundPath, 'utf8');
 assert.equal(
-  assertSingleTag(notFoundHtml, /<meta\s+name="robots"\s+content="([^"]*)"\s*\/?>/gi, '<meta name="robots">', '/404.html'),
+  assertSingleTag(
+    notFoundHtml,
+    /<meta\s+name="robots"\s+content="([^"]*)"\s*\/?>/gi,
+    '<meta name="robots">',
+    '/404.html',
+  ),
   'noindex, nofollow',
 );
-assert.equal(extractAll(notFoundHtml, /<link\s+rel="canonical"\s+href="([^"]*)"/gi).length, 0, '404.html must not emit a canonical URL');
-assert.equal(extractAll(notFoundHtml, /<script[^>]*type="application\/ld\+json"/gi).length, 0, '404.html must not emit JSON-LD');
+assert.equal(
+  extractAll(notFoundHtml, /<link\s+rel="canonical"\s+href="([^"]*)"/gi).length,
+  0,
+  '404.html must not emit a canonical URL',
+);
+assert.equal(
+  extractAll(notFoundHtml, /<script[^>]*type="application\/ld\+json"/gi).length,
+  0,
+  '404.html must not emit JSON-LD',
+);
 
 // Verify dist/_redirects does NOT exist with self-looping catch-all 200 rule
-assert.ok(!fs.existsSync(path.join(distDir, '_redirects')), 'dist/_redirects catch-all 200 Soft-404 rewrite must not exist');
+assert.ok(
+  !fs.existsSync(path.join(distDir, '_redirects')),
+  'dist/_redirects catch-all 200 Soft-404 rewrite must not exist',
+);
 
 // Verify licenses.html carries noindex, follow and clean link back to /tools/media-converter
 const licensesHtml = fs.readFileSync(path.join(distDir, 'tools/media-converter/licenses.html'), 'utf8');
@@ -190,7 +192,10 @@ for (const [legacySlug, targetSlug] of legacyPairs) {
 }
 
 // Verify Search Console verification files exist in dist/
-assert.ok(fs.existsSync(path.join(distDir, 'googlecca6cea465225adc.html')), 'Google Search Console HTML verification file missing in dist/');
+assert.ok(
+  fs.existsSync(path.join(distDir, 'googlecca6cea465225adc.html')),
+  'Google Search Console HTML verification file missing in dist/',
+);
 assert.match(fs.readFileSync(path.join(distDir, 'index.html'), 'utf8'), /name="google-site-verification"/);
 
 // Verify sitemap.xml contains exclusively the discovered canonical URLs and matches robots.txt
@@ -207,7 +212,10 @@ const robotsTxt = fs.readFileSync(path.join(distDir, 'robots.txt'), 'utf8');
 assert.match(robotsTxt, /^User-agent:\s*\*/m);
 assert.match(robotsTxt, /^Allow:\s*\/$/m);
 assert.ok(!/^Disallow:\s*\/$/m.test(robotsTxt), 'robots.txt must not disallow crawling /');
-assert.ok(robotsTxt.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`), 'robots.txt Sitemap directive must match SITE_ORIGIN');
+assert.ok(
+  robotsTxt.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`),
+  'robots.txt Sitemap directive must match SITE_ORIGIN',
+);
 
 console.log(
   `[seo-check] Verified ${canonicalRoutes.length} canonical routes, 4 legacy canonical consolidations, noindex 404/licenses, GSC verification artifacts, robots.txt, and ${sitemapLocs.length}-URL sitemap (${SITE_ORIGIN}).`,
