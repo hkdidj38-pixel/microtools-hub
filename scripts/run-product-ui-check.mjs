@@ -162,16 +162,27 @@ try {
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
-  // 1. SEO, SSR Prerendering, Dark Shell (zero blank page flash), Sitemap & Robots
+  // 1. SEO, SSR Prerendering, Dark Shell (zero blank page flash), Sitemap, Robots, 404 & GSC Verification
   const sitemapRes = await fetch(`${baseURL}/sitemap.xml`);
   assert.equal(sitemapRes.status, 200, 'sitemap.xml must be served.');
   const sitemapXml = await sitemapRes.text();
   assert.match(sitemapXml, /<loc>https:\/\/microtools-hub-d6l\.pages\.dev\/tools\/json-formatter<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/microtools-hub-d6l\.pages\.dev\/tools\/jwt-decoder<\/loc>/);
+  assert.ok(!sitemapXml.includes('<loc>https://microtools-hub-d6l.pages.dev/json-formatter/</loc>'), 'Legacy duplicate routes must be excluded from sitemap.xml.');
 
   const robotsRes = await fetch(`${baseURL}/robots.txt`);
   assert.equal(robotsRes.status, 200, 'robots.txt must be served.');
   assert.match(await robotsRes.text(), /Sitemap:\s*https:\/\/microtools-hub-d6l\.pages\.dev\/sitemap\.xml/);
+
+  const gscRes = await fetch(`${baseURL}/googlecca6cea465225adc.html`);
+  assert.equal(gscRes.status, 200, 'Google Search Console HTML verification file must be served.');
+  assert.match(await gscRes.text(), /google-site-verification:\s*googlecca6cea465225adc\.html/);
+
+  const notFoundHtmlRes = await fetch(`${baseURL}/404.html`);
+  assert.equal(notFoundHtmlRes.status, 200);
+  const notFoundStaticHtml = await notFoundHtmlRes.text();
+  assert.match(notFoundStaticHtml, /<meta\s+name="robots"\s+content="noindex,\s*nofollow"/i);
+  assert.ok(!notFoundStaticHtml.includes('rel="canonical"'), '404.html must not contain a canonical URL.');
 
   const prerenderContext = await browser.newContext({
     javaScriptEnabled: false,
@@ -184,15 +195,72 @@ try {
   const homeBgNoJs = await prerenderPage.evaluate(() => getComputedStyle(document.body).backgroundColor);
   assert.equal(homeBgNoJs, 'rgb(10, 10, 11)', 'Prerendered homepage must paint forced dark #0A0A0B without JS.');
 
+  const homeJsonLdNoJs = JSON.parse(await prerenderPage.locator('#hub-jsonld').textContent());
+
   const toolNoJs = await prerenderPage.goto(`${baseURL}/tools/json-formatter/`, { waitUntil: 'networkidle' });
   assert.equal(toolNoJs?.status(), 200);
   assert.equal(
     await prerenderPage.title(),
     'JSON Formatter & Validator - Private, Offline & Free | MicroTools Hub',
   );
+  assert.equal(await prerenderPage.locator('script[type="application/ld+json"]').count(), 1);
   const jsonLdRaw = await prerenderPage.locator('script[type="application/ld+json"]').first().textContent();
-  assert.ok(jsonLdRaw && jsonLdRaw.includes('SoftwareApplication') && jsonLdRaw.includes('FAQPage'));
-  console.log('[ui] SSR prerendered dark shell, SEO titles, JSON-LD SoftwareApplication + FAQPage, sitemap.xml, and robots.txt verified');
+  assert.ok(
+    jsonLdRaw &&
+      jsonLdRaw.includes('SoftwareApplication') &&
+      jsonLdRaw.includes('BreadcrumbList') &&
+      jsonLdRaw.includes('FAQPage'),
+  );
+  assert.match(await prerenderPage.locator('body').innerText(), /Related developer utilities/);
+
+  // Client & HTTP 404 SEO lifecycle: unknown route returns HTTP 404 + noindex & zero canonical; valid routes restore canonical + single JSON-LD
+  const missingNavRes = await page.goto(`${baseURL}/tools/nonexistent-seo-route`, { waitUntil: 'networkidle' });
+  assert.equal(missingNavRes?.status(), 404, 'Unknown routes must return real HTTP 404 status.');
+  assert.equal(missingNavRes?.headers()['x-robots-tag'], 'noindex, nofollow');
+  await page.getByRole('heading', { level: 1, name: 'Utility route not found' }).waitFor();
+  assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'noindex, nofollow');
+  assert.equal(await page.locator('link[rel="canonical"]').count(), 0);
+  assert.equal(await page.locator('script[type="application/ld+json"]').count(), 0);
+
+  await page.getByRole('link', { name: 'Return to Directory' }).click();
+  await page.waitForURL(`${baseURL}/`);
+  await page.getByRole('heading', { level: 1, name: /Tools that don't steal your data\./ }).waitFor();
+  assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'index, follow');
+  assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');
+  assert.equal(await page.locator('script[type="application/ld+json"]').count(), 1);
+
+  assert.deepEqual(
+    JSON.parse(await page.locator('#hub-jsonld').textContent()),
+    homeJsonLdNoJs,
+    'Homepage structured data and tool order must match before and after React mounts.',
+  );
+
+  await page.getByRole('link', { name: 'JSON Formatter & Validator', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('link[rel="canonical"]')?.getAttribute('href')?.endsWith('/tools/json-formatter'),
+  );
+  const relatedLink = page.locator('section[aria-labelledby="related-tools-heading"] a[href^="/tools/"]').first();
+  const relatedRoute = await relatedLink.getAttribute('href');
+  await prerenderPage.goto(`${baseURL}${relatedRoute}`, { waitUntil: 'networkidle' });
+  const relatedTitle = await prerenderPage.title();
+  const relatedJsonLd = JSON.parse(await prerenderPage.locator('#hub-jsonld').textContent());
+  await relatedLink.click();
+  await page.waitForFunction(
+    (route) => document.querySelector('link[rel="canonical"]')?.getAttribute('href')?.endsWith(route),
+    relatedRoute,
+  );
+  assert.equal(await page.title(), relatedTitle);
+  assert.equal(await page.locator('script[type="application/ld+json"]').count(), 1);
+  assert.deepEqual(JSON.parse(await page.locator('#hub-jsonld').textContent()), relatedJsonLd);
+  await page.goBack();
+  await page.waitForFunction(() =>
+    document.querySelector('link[rel="canonical"]')?.getAttribute('href')?.endsWith('/tools/json-formatter'),
+  );
+  assert.equal(await page.title(), 'JSON Formatter & Validator - Private, Offline & Free | MicroTools Hub');
+
+  await page.goto(`${baseURL}/?category=Security`, { waitUntil: 'networkidle' });
+  assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');
+  console.log('[ui] SSR prerendered dark shell, SEO titles, single JSON-LD, 404 noindex lifecycle, GSC verification, sitemap.xml, and robots.txt verified');
 
   // 2. Responsive overflow & screenshot sweep across 320px -> 2560px
   for (const width of viewports) {

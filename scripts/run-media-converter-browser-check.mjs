@@ -241,6 +241,23 @@ try {
   assert.deepEqual(coreAssetRequests, [], 'FFmpeg core assets must not be fetched before the user starts a conversion.');
   console.log('[browser] _headers overlap/detachment verified; other tools retain strict CSP; core remains lazy and low-memory notice is visible');
 
+  // Exercise conversion after client-side navigation retains the homepage's stricter CSP.
+  const homeResponse = await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  assert.equal(homeResponse?.status(), 200);
+  const homeCsp = homeResponse?.headers()['content-security-policy'] ?? '';
+  assert.match(homeCsp, /script-src 'self';/);
+  assert.match(homeCsp, /connect-src 'self';/);
+  const documentRequests = [];
+  const recordDocumentRequest = (request) => {
+    if (request.resourceType() === 'document') documentRequests.push(request.url());
+  };
+  page.on('request', recordDocumentRequest);
+  await page.locator('a[href="/tools/media-converter"]').first().click();
+  await page.waitForURL(`${baseURL}/tools/media-converter`);
+  await page.getByRole('heading', { name: '1. Select one media file' }).waitFor();
+  page.off('request', recordDocumentRequest);
+  assert.deepEqual(documentRequests, [], 'The directory card must navigate without replacing the strict-CSP document.');
+
   const fileInput = page.locator('#media-file');
   await fileInput.setInputFiles(path.join(tempRoot, 'synthetic.mp4'));
   await page.route('**/ffmpeg-core/part-01-*.bin', async (route) => {
@@ -272,7 +289,7 @@ try {
   assert.ok(coreAssetRequests.some((url) => /\/ffmpeg-core\/part-02-[a-f0-9]{64}\.bin$/.test(url)), 'The second WASM part should load after conversion starts.');
   assert.ok(coreAssetRequests.some((url) => /\/assets\/ffmpeg-core-[\w-]+\.js$/.test(url)), 'The same-origin core JavaScript should load only when conversion starts.');
   assert.ok(!coreAssetRequests.some((url) => /\.wasm$/.test(url)), 'The browser should use the verified WASM Blob, not request a single remote/static .wasm file.');
-  console.log(`[browser] synthetic MP4 converted and downloaded as WebM (${fs.statSync(webmOutput).size} bytes)`);
+  console.log(`[browser] homepage SPA navigation retained strict CSP; synthetic MP4 converted and downloaded as WebM (${fs.statSync(webmOutput).size} bytes)`);
 
   await fileInput.setInputFiles(path.join(tempRoot, 'synthetic.wav'));
   await page.getByRole('button', { name: 'Convert media' }).click();

@@ -1,16 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Star } from 'lucide-react';
-import type { ToolMeta } from '@/lib/registry';
+import { ArrowUpRight, ChevronRight, Star } from 'lucide-react';
+import { TOOLS_REGISTRY, type ToolMeta } from '@/lib/registry';
+import { applyPageSeo, buildToolDocumentTitle, buildToolJsonLd } from '@/lib/seo';
 import { SITE_ORIGIN } from '@/lib/siteConfig';
 import { useLocalActivityPulse } from '@/lib/storage';
 
-export function buildToolDocumentTitle(tool: ToolMeta): string {
-  if (tool.privacy.mode === 'edge') {
-    return `${tool.name} - Fail-Closed Edge Metadata | MicroTools Hub`;
-  }
-  return `${tool.name} - Private, Offline & Free | MicroTools Hub`;
-}
+export { buildToolDocumentTitle };
 
 interface ToolLayoutProps {
   tool: ToolMeta;
@@ -29,51 +25,29 @@ export function ToolLayout({
   const isEdge = tool.privacy.mode === 'edge';
 
   useEffect(() => {
-    document.title = buildToolDocumentTitle(tool);
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute('content', tool.description);
-    const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute('href', `${SITE_ORIGIN}/tools/${tool.slug}`);
+    applyPageSeo({
+      title: buildToolDocumentTitle(tool),
+      description: tool.description,
+      canonicalUrl: `${SITE_ORIGIN}/tools/${encodeURIComponent(tool.slug)}`,
+      robots: 'index, follow',
+      jsonLd: buildToolJsonLd(tool, SITE_ORIGIN),
+    });
   }, [tool]);
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@graph': [
-      {
-        '@type': 'SoftwareApplication',
-        name: tool.name,
-        applicationCategory: 'DeveloperApplication',
-        operatingSystem: 'Any (Web Browser)',
-        url: `${SITE_ORIGIN}/tools/${tool.slug}`,
-        description: tool.description,
-        isAccessibleForFree: true,
-        offers: {
-          '@type': 'Offer',
-          price: '0',
-          priceCurrency: 'USD',
-        },
-      },
-      {
-        '@type': 'FAQPage',
-        mainEntity: tool.faqs.map((faq) => ({
-          '@type': 'Question',
-          name: faq.q,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: faq.a,
-          },
-        })),
-      },
-    ],
-  };
+  const relatedTools = useMemo(() => {
+    const others = TOOLS_REGISTRY.filter((entry) => entry.slug !== tool.slug);
+    const sameCategory = others.filter((entry) => entry.category === tool.category);
+    const fallback = others.filter(
+      (entry) => entry.category !== tool.category && entry.popular,
+    );
+    const rest = others.filter(
+      (entry) => entry.category !== tool.category && !entry.popular,
+    );
+    return [...sameCategory, ...fallback, ...rest].slice(0, 4);
+  }, [tool.slug, tool.category]);
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-
       <div className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-7 sm:px-6 sm:py-9">
         {/* Breadcrumb + Favorite Star */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -191,9 +165,59 @@ export function ToolLayout({
             </div>
           </section>
         </div>
+
+        {/* Related Utilities Cross-Links */}
+        <section
+          aria-labelledby="related-tools-heading"
+          className="mt-10 border-t border-line pt-8"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-wider text-brand">
+                EXPLORE MORE
+              </p>
+              <h2 id="related-tools-heading" className="mt-1 text-lg font-semibold text-ink">
+                Related developer utilities
+              </h2>
+            </div>
+            <Link
+              to="/"
+              className="font-mono text-xs text-muted transition-colors hover:text-ink"
+            >
+              All {TOOLS_REGISTRY.length} utilities →
+            </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {relatedTools.map((rel) => (
+              <Link
+                key={rel.slug}
+                to={`/tools/${rel.slug}`}
+                className="group flex flex-col justify-between rounded-[10px] border border-line bg-surface p-4 transition-colors hover:border-brand/50 hover:bg-surface-hover"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="rounded-[4px] border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted">
+                      {rel.category}
+                    </span>
+                    <ArrowUpRight
+                      className="h-3.5 w-3.5 text-muted transition-colors group-hover:text-ink"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <h3 className="mt-2.5 text-sm font-semibold text-ink">
+                    {rel.name}
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    {rel.useCase ?? rel.description}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       </div>
 
-      {/* Task 7: Sticky Local Proof / Disclosed Edge Telemetry Bar */}
+      {/* Sticky Local Proof / Disclosed Edge Telemetry Bar */}
       <div
         className="sticky bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-md"
         role="region"
