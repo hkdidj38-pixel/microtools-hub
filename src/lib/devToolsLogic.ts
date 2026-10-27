@@ -176,11 +176,11 @@ export async function computeByteHashes(
 }
 
 export async function computeHashes(
-  input: string,
+  input: string | ArrayBuffer,
   encoding: 'hex' | 'base64' = 'hex',
 ): Promise<TransformOutcome> {
-  if (!input) return { output: '', error: null };
-  const data = new TextEncoder().encode(input);
+  if (input === '') return { output: '', error: null };
+  const data = typeof input === 'string' ? new TextEncoder().encode(input) : input;
   return computeByteHashes(data, encoding);
 }
 
@@ -243,7 +243,8 @@ export function transformUrl(
     }
 
     const candidate = input.trim();
-    const url = candidate.includes('://')
+    const isFullUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(candidate);
+    const url = isFullUrl
       ? new URL(candidate)
       : new URL(
           candidate.startsWith('?')
@@ -265,7 +266,7 @@ export function transformUrl(
       }
     }
 
-    const parsed = candidate.includes('://')
+    const parsed = isFullUrl
       ? {
           protocol: url.protocol,
           host: url.host,
@@ -840,10 +841,19 @@ export function computeLineDiff(input: string): TransformOutcome {
 
   const leftRaw = input.slice(0, sepMatch.index);
   const rightRaw = input.slice(sepMatch.index + sepMatch[0].length);
-  const left = leftRaw === '' ? [] : leftRaw.split(/\r?\n/);
-  const right = rightRaw === '' ? [] : rightRaw.split(/\r?\n/);
+  // The separator's surrounding newline belongs to the separator. Preserve
+  // every remaining terminator so patches reproduce each block byte-for-byte.
+  const splitLines = (text: string): string[] => {
+    const lines = text.split('\n');
+    return lines.flatMap((line, index) => {
+      if (index < lines.length - 1) return [`${line}\n`];
+      return line ? [line] : [];
+    });
+  };
+  const left = splitLines(leftRaw);
+  const right = splitLines(rightRaw);
 
-  if (left.length * right.length > 250_000) {
+  if (left.length > 500 || right.length > 500 || left.length * right.length > 250_000) {
     return { output: '', error: 'Diff input exceeds 500×500 line interactive matrix cap.' };
   }
 
@@ -918,7 +928,7 @@ export function computeLineDiff(input: string): TransformOutcome {
     }
   }
 
-  const out: string[] = ['--- a/original', '+++ b/modified'];
+  const out: string[] = ['--- a/original', '+++ b/original'];
   for (const hunk of hunks) {
     const slice = ops.slice(hunk.start, hunk.end + 1);
     const oldOps = slice.filter((o) => o.type !== '+');
@@ -929,7 +939,9 @@ export function computeLineDiff(input: string): TransformOutcome {
     const newStart = newCount === 0 ? Math.max(0, slice[0].newLine - 1) : newOps[0].newLine;
     out.push(`@@ -${formatUnifiedRange(oldStart, oldCount)} +${formatUnifiedRange(newStart, newCount)} @@`);
     for (const op of slice) {
-      out.push(`${op.type}${op.text}`);
+      const hasNewline = op.text.endsWith('\n');
+      out.push(op.type + (hasNewline ? op.text.slice(0, -1) : op.text));
+      if (!hasNewline) out.push('\\ No newline at end of file');
     }
   }
 

@@ -109,6 +109,29 @@ test('WebCrypto SHA generator matches Node crypto digests in hex and base64', as
   assert.ok(b64Res.output.includes(expectedSha384B64));
 });
 
+test('File hashes preserve binary bytes, UTF-8 BOMs, and empty files', async () => {
+  const samples = [
+    Uint8Array.from([0x00, 0xff, 0xfe, 0x80, 0x41, 0x0d, 0x0a]),
+    Uint8Array.from([0xef, 0xbb, 0xbf, 0x68, 0x69]),
+    new Uint8Array(),
+  ];
+  for (const bytes of samples) {
+    for (const encoding of ['hex', 'base64']) {
+      const result = await logic.computeHashes(bytes.buffer, encoding);
+      assert.equal(result.error, null);
+      for (const algorithm of ['sha256', 'sha384', 'sha512', 'sha1']) {
+        assert.ok(result.output.includes(createHash(algorithm).update(bytes).digest(encoding)));
+      }
+    }
+  }
+  assert.equal((await logic.computeHashes('')).output, '');
+
+  const sliced = Uint8Array.from([0x11, 0xff, 0x00, 0x22]).subarray(1, 3);
+  const slicedResult = await logic.computeByteHashes(sliced, 'hex', 'slice.bin');
+  assert.ok(slicedResult.output.includes(createHash('sha256').update(sliced).digest('hex')));
+  assert.match(slicedResult.detail, /slice\.bin \(2 raw bytes\)/);
+});
+
 test('UUID v4, ULID, and CSPRNG token generator produces valid formats', () => {
   const uuids = logic.generateIdentifiers('4', 'uuid');
   const lines = uuids.output.trim().split('\n');
@@ -141,6 +164,52 @@ test('URL codec and HTML entity codec round-trip special characters', () => {
   assert.equal(logic.transformHtmlEntities(encoded.output, 'decode').output, html);
 });
 
+test('Query-only input accepts URL values and preserves prototype-named parameters', () => {
+  for (const query of ['next=https://example.com/path&count=2', '?next=https://example.com/path&count=2']) {
+    const result = logic.transformUrl(query, 'parse');
+    assert.equal(result.error, null);
+    const parsed = JSON.parse(result.output);
+    assert.equal(parsed.query.next, 'https://example.com/path');
+    assert.equal(parsed.query.count, '2');
+    assert.equal(parsed.queryCount, 2);
+    assert.equal(parsed.host, undefined);
+  }
+
+  const params = '__proto__=first&__proto__=second&constructor=one&constructor=two&toString=value';
+  for (const input of [params, `https://example.com/?${params}`]) {
+    const result = logic.transformUrl(input, 'parse');
+    assert.equal(result.error, null);
+    const parsed = JSON.parse(result.output);
+    assert.deepEqual(parsed.query.__proto__, ['first', 'second']);
+    assert.deepEqual(parsed.query.constructor, ['one', 'two']);
+    assert.equal(parsed.query.toString, 'value');
+    assert.equal(parsed.queryCount, 5);
+  }
+});
+
+test('HTML entities encode astral code points as single valid numeric references', () => {
+  const text = 'Emoji: 😀 𠮷 👩‍💻 & <tag>\n';
+  const encoded = logic.transformHtmlEntities(text, 'encode');
+  assert.equal(encoded.error, null);
+  assert.ok(encoded.output.includes('&#x1F600;'));
+  assert.ok(encoded.output.includes('&#x20BB7;'));
+  assert.doesNotMatch(encoded.output, /&#xD[89A-F][0-9A-F]{2};/);
+  assert.equal(logic.transformHtmlEntities(encoded.output, 'decode').output, text);
+});
+
+test('Global zero-length regex matches advance across entire Unicode code points', () => {
+  for (const [pattern, flags, corpus] of [
+    ['(?:)', 'gu', '😀x𠮷'],
+    ['(?=.)', 'gu', '😀x'],
+    ['(?:)', 'g', '😀'],
+  ]) {
+    const result = logic.evaluateRegex(pattern, flags, corpus);
+    assert.equal(result.error, null);
+    const expected = [...corpus.matchAll(new RegExp(pattern, flags))].map((match) => match.index);
+    assert.deepEqual(JSON.parse(result.output).map((match) => match.index), expected);
+  }
+});
+
 test('Regex evaluator, timestamp converter, case transformer, diff, and word metrics work accurately', () => {
   const rx = logic.evaluateRegex('(?<lvl>ERROR|WARN)\\s+(\\d+)', 'g', 'WARN 404\nINFO 200\nERROR 502');
   assert.equal(rx.error, null);
@@ -158,13 +227,80 @@ test('Regex evaluator, timestamp converter, case transformer, diff, and word met
   assert.equal(slug.output, 'creme-brulee-cafe');
 
   const diff = logic.computeLineDiff('alpha\nbeta\n===\nalpha\ngamma');
-  assert.match(diff.output, /^--- a\/original\n\+\+\+ b\/modified\n@@ -1,2 \+1,2 @@/m);
-  assert.match(diff.output, /\n-beta\n\+gamma\n/);
+  assert.match(diff.output, /^--- a\/original\n\+\+\+ b\/original\n@@ -1,2 \+1,2 @@/m);
+  assert.match(diff.output, /^-beta$/m);
+  assert.match(diff.output, /^\+gamma$/m);
 
   const metrics = logic.analyzeTextMetrics('Hello world café');
   const metricsJson = JSON.parse(metrics.output);
   assert.equal(metricsJson.words, 3);
   assert.ok(metricsJson.utf8_bytes > metricsJson.characters);
+});
+
+test('Exported unified patches apply exactly, including whitespace and final-newline changes', () => {
+  const samples = [
+    ['alpha\nbeta', 'alpha\ngamma'],
+    ['alpha\nbeta', 'gamma\nbeta'],
+    ['alpha\nbeta\n', 'alpha\ngamma\n'],
+    ['keep\n remove\nlast\n', 'keep\n\tadded\nlast\n'],
+    ['alpha', 'alpha\n'],
+    ['alpha\n', 'alpha'],
+    ['', 'new\n'],
+    ['', 'new'],
+    ['old\n', ''],
+    ['old', ''],
+    ['\n', '\n\n'],
+    ['alpha\r\nbeta\r\n', 'alpha\r\ngamma\r\n'],
+    ['alpha\nbeta\n', 'alpha\r\nbeta\r\n'],
+    ['first\n', 'first\n===\nlast\n'],
+    ['', 'new', '===\nnew'],
+    ['old', '', 'old\n==='],
+  ];
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-diff-'));
+  try {
+    for (const [original, modified, explicitInput] of samples) {
+      const result = logic.computeLineDiff(explicitInput ?? `${original}\n===\n${modified}`);
+      assert.equal(result.error, null);
+      assert.match(result.output, /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@$/m);
+      fs.writeFileSync(path.join(directory, 'original'), original);
+      fs.writeFileSync(path.join(directory, 'change.patch'), result.output);
+      execFileSync('git', ['apply', '--check', '--whitespace=nowarn', 'change.patch'], { cwd: directory });
+      execFileSync('git', ['apply', '--whitespace=nowarn', 'change.patch'], { cwd: directory });
+      assert.equal(fs.readFileSync(path.join(directory, 'original'), 'utf8'), modified);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+
+  const unchanged = logic.computeLineDiff('same\n===\nsame');
+  assert.equal(unchanged.error, null);
+  assert.equal(unchanged.output, '');
+  assert.equal(logic.computeLineDiff('===').output, '');
+
+  for (const [original, modified] of [
+    ['x\n'.repeat(501), ''],
+    ['', 'x\n'.repeat(501)],
+  ]) {
+    assert.match(logic.computeLineDiff(`${original}\n===\n${modified}`).error, /matrix cap/);
+  }
+});
+
+test('Unified patches keep separate context hunks and apply distant changes exactly', () => {
+  const original = Array.from({ length: 30 }, (_, index) => `line ${index}\n`).join('');
+  const modified = original.replace('line 2\n', 'changed 2\n').replace('line 26\n', 'changed 26\n');
+  const result = logic.computeLineDiff(`${original}\n===\n${modified}`);
+  assert.equal(result.error, null);
+  assert.equal(result.output.match(/^@@ /gm).length, 2);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-diff-context-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'original'), original);
+    fs.writeFileSync(path.join(directory, 'change.patch'), result.output);
+    execFileSync('git', ['apply', '--check', 'change.patch'], { cwd: directory });
+    execFileSync('git', ['apply', 'change.patch'], { cwd: directory });
+    assert.equal(fs.readFileSync(path.join(directory, 'original'), 'utf8'), modified);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('PR #39 regressions: Unicode regex lastIndex, astral HTML entities, full named entities, URL prototype safety, raw byte SHA, component + decode, astral char count, and git-apply unified diff', async () => {
@@ -236,10 +372,12 @@ test('PR #39 regressions: Unicode regex lastIndex, astral HTML entities, full na
   try {
     const patchContent = patchRes.output
       .replace('--- a/original', '--- a/sample.txt')
-      .replace('+++ b/modified', '+++ b/sample.txt');
-    fs.writeFileSync(path.join(tmpDir, 'sample.txt'), `${origLines}\n`, 'utf8');
+      .replace('+++ b/original', '+++ b/sample.txt');
+    fs.writeFileSync(path.join(tmpDir, 'sample.txt'), origLines, 'utf8');
     fs.writeFileSync(path.join(tmpDir, 'changes.diff'), patchContent, 'utf8');
     execFileSync('git', ['apply', '--check', 'changes.diff'], { cwd: tmpDir, stdio: 'pipe' });
+    execFileSync('git', ['apply', 'changes.diff'], { cwd: tmpDir, stdio: 'pipe' });
+    assert.equal(fs.readFileSync(path.join(tmpDir, 'sample.txt'), 'utf8'), modLines);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -276,7 +414,6 @@ test('All 16 tool meta.ts files have zero imports and complete metadata', () => 
 
   assert.equal(localCount, 15);
   assert.equal(edgeCount, 1);
-
   // Issue 13: Client SEO components must derive SITE_ORIGIN from shared siteConfig (SITE_URL) rather than hardcoding pages.dev
   const appSrc = fs.readFileSync(path.resolve('src/App.tsx'), 'utf8');
   const layoutSrc = fs.readFileSync(path.resolve('src/components/ToolLayout.tsx'), 'utf8');

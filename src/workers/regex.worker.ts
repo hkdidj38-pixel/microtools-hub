@@ -1,20 +1,12 @@
-import { evaluateRegex } from '../lib/devToolsLogic';
+import { evaluateRegex } from '@/lib/devToolsLogic';
+import type { RegexEvaluation, RegexRequest } from '../tools/regex-tester/workerClient';
 
-interface RegexWorkerRequest {
-  requestId: number;
-  pattern: string;
-  flags: string;
-  corpus: string;
-}
-
-self.onmessage = (event: MessageEvent<RegexWorkerRequest>) => {
-  const { requestId, pattern, flags, corpus } = event.data;
+self.onmessage = (event: MessageEvent<RegexRequest>) => {
+  const { pattern, flags, corpus } = event.data;
   const start = performance.now();
-  const outcome = evaluateRegex(pattern, flags, corpus);
-  const execMs = Math.max(0.05, performance.now() - start);
+  const result = evaluateRegex(pattern, flags, corpus);
   self.postMessage({
-    requestId,
-    ...outcome,
-    execMs,
-  });
+    ...result,
+    execMs: Math.max(0.05, performance.now() - start),
+  } satisfies RegexEvaluation);
 };
