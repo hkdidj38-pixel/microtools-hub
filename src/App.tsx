@@ -388,6 +388,7 @@ function ToolRoute({
       onToggleFavorite={onToggleFavorite}
     >
       <Suspense
+        key={tool.slug}
         fallback={
           <div
             className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"

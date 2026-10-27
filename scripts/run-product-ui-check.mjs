@@ -211,8 +211,10 @@ try {
   );
   assert.match(await prerenderPage.locator('body').innerText(), /Related developer utilities/);
 
-  // Client SPA SEO lifecycle: 404 sets noindex & removes canonical; valid routes restore canonical + single JSON-LD
-  await page.goto(`${baseURL}/tools/nonexistent-seo-route`, { waitUntil: 'networkidle' });
+  // Client & HTTP 404 SEO lifecycle: unknown route returns HTTP 404 + noindex & zero canonical; valid routes restore canonical + single JSON-LD
+  const missingNavRes = await page.goto(`${baseURL}/tools/nonexistent-seo-route`, { waitUntil: 'networkidle' });
+  assert.equal(missingNavRes?.status(), 404, 'Unknown routes must return real HTTP 404 status.');
+  assert.equal(missingNavRes?.headers()['x-robots-tag'], 'noindex, nofollow');
   await page.getByRole('heading', { level: 1, name: 'Utility route not found' }).waitFor();
   assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'noindex, nofollow');
   assert.equal(await page.locator('link[rel="canonical"]').count(), 0);
@@ -220,7 +222,7 @@ try {
 
   await page.getByRole('link', { name: 'Return to Directory' }).click();
   await page.waitForURL(`${baseURL}/`);
-  await page.getByRole('heading', { level: 1 }).waitFor();
+  await page.getByRole('heading', { level: 1, name: /Tools that don't steal your data\./ }).waitFor();
   assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'index, follow');
   assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');
   assert.equal(await page.locator('script[type="application/ld+json"]').count(), 1);

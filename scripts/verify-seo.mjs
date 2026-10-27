@@ -43,6 +43,15 @@ const seenH1s = new Map();
 for (const { route, file, expectedCanonical } of canonicalRoutes) {
   assert.ok(fs.existsSync(file), `Missing prerendered HTML for ${route}: ${file}`);
   const html = fs.readFileSync(file, 'utf8');
+  if (route.startsWith('/tools/')) {
+    const cleanFile = path.join(distDir, `${route.slice(1)}.html`);
+    assert.ok(fs.existsSync(cleanFile), `Missing clean-URL prerendered HTML for ${route}: ${cleanFile}`);
+    assert.equal(
+      fs.readFileSync(cleanFile, 'utf8'),
+      html,
+      `${route}: clean-URL .html and directory index.html must be identical`,
+    );
+  }
 
   const title = assertSingleTag(html, /<title>([\s\S]*?)<\/title>/gi, '<title>', route).trim();
   assert.ok(title.length >= 25 && title.length <= 90, `${route}: title length ${title.length} outside [25, 90]: "${title}"`);

@@ -77,9 +77,13 @@ test('Public directory preserves GSC verification, avoids stale generated files,
   assert.match(gscFile, /google-site-verification:\s*googlecca6cea465225adc\.html/);
 
   const headers = fs.readFileSync(path.resolve('public/_headers'), 'utf8');
-  assert.match(headers, /\/tools\/media-converter\/licenses\.html[\s\S]*?X-Robots-Tag:\s*noindex,\s*follow/);
-  assert.match(headers, /\/tools\/media-converter\/GPL-2\.0\.txt[\s\S]*?X-Robots-Tag:\s*noindex,\s*nofollow/);
-  assert.match(headers, /\/googlecca6cea465225adc\.html[\s\S]*?X-Robots-Tag:\s*noindex,\s*nofollow/);
+  assert.match(headers, /\/tools\/media-converter\/licenses\s+X-Robots-Tag:\s*noindex,\s*follow/);
+  assert.match(headers, /\/tools\/media-converter\/licenses\.html\s+X-Robots-Tag:\s*noindex,\s*follow/);
+  assert.match(headers, /\/tools\/media-converter\/GPL-2\.0\.txt\s+X-Robots-Tag:\s*noindex,\s*nofollow/);
+  assert.match(headers, /\/googlecca6cea465225adc\s+X-Robots-Tag:\s*noindex,\s*nofollow/);
+  assert.match(headers, /\/googlecca6cea465225adc\.html\s+X-Robots-Tag:\s*noindex,\s*nofollow/);
+  assert.match(headers, /\/404\s+X-Robots-Tag:\s*noindex,\s*nofollow/);
+  assert.match(headers, /\/404\.html\s+X-Robots-Tag:\s*noindex,\s*nofollow/);
 
   const robots = fs.readFileSync(path.resolve('public/robots.txt'), 'utf8');
   assert.match(robots, /Sitemap:\s*https:\/\/microtools-hub-d6l\.pages\.dev\/sitemap\.xml/);

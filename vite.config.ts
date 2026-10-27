@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,15 +26,127 @@ function resolveSiteOrigin(raw = process.env.SITE_URL): string {
   return `${parsed.origin}${cleanPath}`;
 }
 
+function globMatches(pattern: string, pathname: string): boolean {
+  const escaped = pattern
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*');
+  return new RegExp(`^${escaped}$`).test(pathname);
+}
+
+function loadPagesHeaderMatcher(headersFilePath: string): (pathname: string) => Map<string, string> {
+  if (!fs.existsSync(headersFilePath)) {
+    return () => new Map();
+  }
+  const rules: Array<{ pattern: string; headers: string[] }> = [];
+  let current: { pattern: string; headers: string[] } | null = null;
+  for (const line of fs.readFileSync(headersFilePath, 'utf8').split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    if (!/^\s/.test(line)) {
+      current = { pattern: line.trim(), headers: [] };
+      rules.push(current);
+      continue;
+    }
+    if (current) {
+      current.headers.push(line.trim());
+    }
+  }
+  return (pathname: string) => {
+    const values = new Map<string, string>();
+    for (const rule of rules) {
+      if (!globMatches(rule.pattern, pathname)) continue;
+      for (const line of rule.headers) {
+        if (line.startsWith('! ')) {
+          values.delete(line.slice(2).toLowerCase());
+          continue;
+        }
+        const sep = line.indexOf(':');
+        if (sep < 1) continue;
+        const name = line.slice(0, sep).trim().toLowerCase();
+        const value = line.slice(sep + 1).trim();
+        values.set(name, values.has(name) ? `${values.get(name)}, ${value}` : value);
+      }
+    }
+    return values;
+  };
+}
+
+function cloudflarePagesPreviewPlugin(): Plugin {
+  return {
+    name: 'cloudflare-pages-preview-fidelity',
+    configurePreviewServer(server) {
+      const distDir = path.resolve(rootDir, 'dist');
+      const headersPath = fs.existsSync(path.join(distDir, '_headers'))
+        ? path.join(distDir, '_headers')
+        : path.join(rootDir, 'public/_headers');
+      const getHeaders = loadPagesHeaderMatcher(headersPath);
+
+      // Apply _headers rules before static asset dispatch
+      server.middlewares.use((req, res, next) => {
+        const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+        for (const [name, value] of getHeaders(pathname)) {
+          res.setHeader(name, value);
+        }
+        next();
+      });
+
+      // Post-htmlFallbackMiddleware hook: if htmlFallbackMiddleware resolved an existing HTML file
+      // in dist/, let indexHtmlMiddleware serve it as 200; otherwise return dist/404.html with HTTP 404.
+      return () => {
+        server.middlewares.use((req, res, next) => {
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            next();
+            return;
+          }
+          const requestUrl = new URL(req.url ?? '/', 'http://localhost');
+          const resolvedPathname = decodeURIComponent(requestUrl.pathname);
+          const candidatePath = path.resolve(distDir, `.${resolvedPathname}`);
+          if (candidatePath.startsWith(`${distDir}${path.sep}`) && fs.existsSync(candidatePath)) {
+            const stat = fs.statSync(candidatePath);
+            if (stat.isFile()) {
+              next();
+              return;
+            }
+            if (
+              stat.isDirectory() &&
+              !resolvedPathname.endsWith('/') &&
+              fs.existsSync(path.join(candidatePath, 'index.html'))
+            ) {
+              res.statusCode = 308;
+              res.setHeader('location', `${resolvedPathname}/${requestUrl.search}`);
+              res.end();
+              return;
+            }
+          }
+          const notFoundPath = path.join(distDir, '404.html');
+          if (!fs.existsSync(notFoundPath)) {
+            next();
+            return;
+          }
+          res.statusCode = 404;
+          res.setHeader('content-type', 'text/html; charset=utf-8');
+          res.setHeader('x-robots-tag', 'noindex, nofollow');
+          if (req.method === 'HEAD') {
+            res.end();
+            return;
+          }
+          res.end(fs.readFileSync(notFoundPath));
+        });
+      };
+    },
+  };
+}
+
 const siteOrigin = resolveSiteOrigin();
 
-export default defineConfig({
+export default defineConfig(({ isPreview }) => ({
+  appType: isPreview ? 'mpa' : 'spa',
   define: {
     __SITE_ORIGIN__: JSON.stringify(siteOrigin),
   },
   server: { allowedHosts: ['.e2b.app'] },
   preview: { allowedHosts: ['.e2b.app'] },
-  plugins: [react()],
+  plugins: [react(), cloudflarePagesPreviewPlugin()],
   resolve: {
     alias: { '@': path.resolve(rootDir, './src') },
   },
@@ -42,4 +155,4 @@ export default defineConfig({
     target: 'esnext',
     commonjsOptions: { include: [/upng-js/, /node_modules/] },
   },
-});
+}));

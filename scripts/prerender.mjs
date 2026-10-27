@@ -291,7 +291,8 @@ for (const meta of parsedTools) {
   const targetDir = path.join(distDir, 'tools', slug);
   fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(path.join(targetDir, 'index.html'), pageHtml, 'utf8');
-  console.log(`[prerender] Generated /tools/${slug}/index.html`);
+  fs.writeFileSync(path.join(distDir, 'tools', `${slug}.html`), pageHtml, 'utf8');
+  console.log(`[prerender] Generated /tools/${slug}.html & /tools/${slug}/index.html`);
 }
 
 /* Prerender dark shell + WebSite & ItemList JSON-LD into dist/index.html */
