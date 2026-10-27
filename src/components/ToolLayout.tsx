@@ -2,9 +2,8 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Star } from 'lucide-react';
 import type { ToolMeta } from '@/lib/registry';
+import { SITE_ORIGIN } from '@/lib/siteConfig';
 import { useLocalActivityPulse } from '@/lib/storage';
-
-const SITE_ORIGIN = 'https://microtools-hub-d6l.pages.dev';
 
 export function buildToolDocumentTitle(tool: ToolMeta): string {
   if (tool.privacy.mode === 'edge') {

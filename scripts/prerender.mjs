@@ -212,6 +212,7 @@ const homeStaticShell = `
   </div>`;
 
 const homeHtml = baseHtml
+  .replace(/<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${esc(SITE_URL)}/" />`)
   .replace('</head>', `    <script type="application/ld+json">${safeHomeJsonLd}</script>\n  </head>`)
   .replace('<div id="root"></div>', `<div id="root">${homeStaticShell}</div>`);
 fs.writeFileSync(indexHtmlPath, homeHtml, 'utf8');

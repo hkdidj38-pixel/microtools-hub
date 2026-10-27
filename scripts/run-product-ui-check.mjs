@@ -309,12 +309,42 @@ try {
   });
   await lazyCheckPage.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
   const eagerHeavyAssets = homeAssetPaths.filter((pathname) =>
-    /ffmpeg-core|\/part-\d+|image-compress\.worker|pdf-merger\.worker|png-quantize\.worker/i.test(pathname),
+    /ffmpeg-core|\/part-\d+|image-compress\.worker|pdf-merger\.worker|png-quantize\.worker|regex\.worker/i.test(pathname),
   );
   assert.deepEqual(eagerHeavyAssets, [], `Homepage must not eagerly load heavy workers/WASM: ${eagerHeavyAssets.join(', ')}`);
   await lazyCheckPage.close();
 
-  // 5. Favorites & Recent History (localStorage) + Command Palette (Cmd+K / Ctrl+K + Fuse.js)
+  // Issue 15: Direct cold visit to /tools/<slug> immediately populates Recent in Command Palette
+  const coldToolPage = await context.newPage();
+  await coldToolPage.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' });
+  await coldToolPage.evaluate(() => localStorage.clear());
+  await coldToolPage.goto(`${baseURL}/tools/jwt-decoder`, { waitUntil: 'networkidle' });
+  await coldToolPage.getByRole('heading', { level: 1, name: 'JWT Decoder & Claims Inspector' }).waitFor();
+  await coldToolPage.keyboard.press('Control+k');
+  const coldDialog = coldToolPage.getByRole('dialog', { name: 'Command palette' });
+  await coldDialog.waitFor();
+  assert.match(await coldDialog.innerText(), /RECENT[\s\S]*JWT Decoder & Claims Inspector/i);
+  await coldToolPage.keyboard.press('Escape');
+  await coldToolPage.close();
+
+  // Issue 11: Blocked/full localStorage still updates Favorites & Recents in-session without throwing
+  const blockedStoragePage = await context.newPage();
+  await blockedStoragePage.addInitScript(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException('QuotaExceededError', 'QuotaExceededError');
+    };
+  });
+  await blockedStoragePage.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  await blockedStoragePage.getByRole('button', { name: 'Save JSON Formatter & Validator to favorites' }).click();
+  await blockedStoragePage.locator('#favorites').waitFor();
+  assert.match(await blockedStoragePage.locator('#favorites').innerText(), /JSON Formatter & Validator/);
+  await blockedStoragePage.close();
+
+  // Reset shared context storage after coldToolPage before running main page persistence assertions
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'networkidle' });
+
+  // 5. Favorites & Recent History (localStorage) + Command Palette Modal Focus Trap & Focus Restoration (Issue 12)
   await page.getByRole('button', { name: 'Save JWT Decoder & Claims Inspector to favorites' }).click();
   await page.locator('#favorites').waitFor();
   const storedFavs = await page.evaluate(() => JSON.parse(localStorage.getItem('favoriteTools') || '[]'));
@@ -324,6 +354,16 @@ try {
   const paletteOpener = page.getByRole('button', { name: 'Open command palette search (Command K)' });
   await paletteOpener.click();
   await dialog.waitFor();
+  const shellStateWhileOpen = await page.evaluate(() => {
+    const shell = document.querySelector('[data-app-shell="true"]');
+    return {
+      inert: Boolean(shell?.inert),
+      ariaHidden: shell?.getAttribute('aria-hidden') ?? null,
+    };
+  });
+  assert.equal(shellStateWhileOpen.inert, true, 'Background shell must be marked inert while Command Palette is open.');
+  assert.equal(shellStateWhileOpen.ariaHidden, 'true', 'Background shell must have aria-hidden="true" while Command Palette is open.');
+
   assert.equal(await dialog.locator('[cmdk-input]').evaluate((element) => element === document.activeElement), true);
   for (const key of ['Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
     await page.keyboard.press(key);
@@ -349,6 +389,14 @@ try {
   await dialog.waitFor({ state: 'hidden' });
   assert.equal(await paletteOpener.evaluate((element) => element === document.activeElement), true, 'Outside click must restore focus.');
 
+  await paletteOpener.focus();
+  await paletteOpener.press('Enter');
+  await dialog.waitFor();
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await paletteOpener.evaluate((element) => element === document.activeElement), true);
+  assert.equal(await page.locator('[data-app-shell="true"]').evaluate((element) => element.inert), false);
+
   // Open Command Palette via Control+k, fuzzy search "sha256", and navigate
   await page.keyboard.press('Control+k');
   await dialog.waitFor();
@@ -363,7 +411,61 @@ try {
   );
   const storedRecents = await page.evaluate(() => JSON.parse(localStorage.getItem('recentTools') || '[]'));
   assert.ok(storedRecents.includes('hash-generator'), 'Visiting a tool route should record recentTools[] in localStorage.');
-  console.log('[ui] Favorites row, recentTools history, and Cmd+K Fuse.js Command Palette verified');
+
+  // Issue 6: Upload raw binary + UTF-8 BOM file into Hash Generator and verify exact byte SHA-256 digest
+  const rawBinaryPayload = Buffer.from([0xef, 0xbb, 0xbf, 0x00, 0xff, 0xfe, 0x61]);
+  const expectedRawSha256 = createHash('sha256').update(rawBinaryPayload).digest('hex');
+  await page.locator('input[aria-label="Upload input file"]').setInputFiles({
+    name: 'bom-and-binary.bin',
+    mimeType: 'application/octet-stream',
+    buffer: rawBinaryPayload,
+  });
+  await page.waitForFunction(
+    (expected) => {
+      const out = document.querySelector('textarea[aria-label="Tool output"]');
+      return Boolean(out && out.value.includes(expected));
+    },
+    expectedRawSha256,
+    { timeout: 10_000 },
+  );
+  assert.match(await page.getByLabel('Live tool statistics').innerText(), /bom-and-binary\.bin \(7 raw bytes\)/);
+
+  // Issue 5: Catastrophic backtracking regex in Web Worker times out cleanly without freezing UI, then recovers
+  await page.goto(`${baseURL}/tools/regex-tester`, { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { level: 1, name: 'Regex Tester & Capture Inspector' }).waitFor();
+  await page.getByLabel('Regular expression pattern').fill('(a+)+$');
+  await page.getByLabel('Tool input').fill(`${'a'.repeat(28)}!`);
+  await page.getByRole('alert').filter({ hasText: /timed out after 450ms/i }).waitFor({ timeout: 5_000 });
+  await page.getByLabel('Regular expression pattern').fill('a+');
+  await page.waitForFunction(() => {
+    const out = document.querySelector('textarea[aria-label="Tool output"]');
+    return Boolean(out && out.value.includes('"match": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa"'));
+  });
+
+  // Issue 10: Stale async File.prototype.text() upload completion must not overwrite newer user edits
+  await page.goto(`${baseURL}/tools/json-formatter`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    const origText = File.prototype.text;
+    window.__origFileText = origText;
+    File.prototype.text = function delayedFileText() {
+      return new Promise((resolve) => {
+        window.__releaseDelayedUpload = () => resolve('{"stale":true}');
+      });
+    };
+  });
+  await page.locator('input[aria-label="Upload input file"]').setInputFiles({
+    name: 'slow.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"stale":true}'),
+  });
+  await page.getByLabel('Tool input').fill('{"fresh":42}');
+  await page.evaluate(async () => {
+    window.__releaseDelayedUpload?.();
+    await new Promise((r) => setTimeout(r, 50));
+    if (window.__origFileText) File.prototype.text = window.__origFileText;
+  });
+  assert.equal(await page.getByLabel('Tool input').inputValue(), '{"fresh":42}', 'Stale file read must not overwrite newer editor input.');
+  console.log('[ui] Favorites, cold-load Recents, blocked-storage resilience, modal focus trap, raw-byte SHA, Worker ReDoS guard, and upload race guard verified');
 
   // 6. Dual-Column CodeWorkbench, Sticky Local Proof Pulse, and Mobile Vertical Stack + Rotated Swap Button
   await page.goto(`${baseURL}/tools/json-formatter`, { waitUntil: 'networkidle' });
@@ -413,10 +515,11 @@ try {
   ]) {
     await page.locator('input[type="file"]').setInputFiles({ name, mimeType: 'application/octet-stream', buffer });
     await waitForOutput(createHash('sha256').update(buffer).digest('hex'));
-    assert.match(await page.getByRole('region', { name: 'Input panel' }).innerText(), /FILE BYTES/);
+    assert.match(await page.getByRole('region', { name: 'Input panel' }).innerText(), /raw bytes loaded via ArrayBuffer/);
   }
   await page.getByRole('button', { name: 'Base64 (SRI)', exact: true }).click();
   await waitForOutput(createHash('sha256').update(Buffer.alloc(0)).digest('base64'));
+  await page.getByRole('button', { name: 'Switch to Text Input', exact: true }).click();
   await page.getByLabel('Tool input', { exact: true }).fill('abc');
   await waitForOutput(createHash('sha256').update('abc').digest('base64'));
   assert.match(await page.getByRole('region', { name: 'Input panel' }).innerText(), /PLAINTEXT/);
@@ -455,10 +558,16 @@ try {
     setTimeout(() => resolve(performance.now() - start), 100);
   }));
   assert.ok(timerElapsed < 900, `Main-thread timer must remain responsive during backtracking (${timerElapsed}ms).`);
-  await page.getByRole('alert').filter({ hasText: 'Regex evaluation timed out after 1 second' }).waitFor({ timeout: 5_000 });
+  await page.getByRole('alert').filter({ hasText: 'Regex evaluation timed out after 450ms' }).waitFor({ timeout: 5_000 });
   await page.getByLabel('Regular expression pattern', { exact: true }).fill('a+');
   await waitForOutput('"match":');
   assert.equal(JSON.parse(await page.getByLabel('Tool output', { exact: true }).inputValue())[0].match, 'a'.repeat(35));
+  assert.equal(await page.getByRole('alert').count(), 0);
+  await page.getByLabel('Regular expression pattern', { exact: true }).fill('(a+)+$');
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Regex evaluation cancelled by user.' }).waitFor();
+  await page.getByLabel('Regular expression pattern', { exact: true }).fill('a+');
+  await waitForOutput('"match":');
   assert.equal(await page.getByRole('alert').count(), 0);
   console.log('[ui] raw binary/BOM/empty-file hashes, text-mode reset, Unicode HTML/query/regex, regex timeout and recovery verified');
 
@@ -534,7 +643,55 @@ try {
   await pdfFaq.focus();
   await pdfFaq.press('Enter');
   assert.equal(await page.locator('details').first().evaluate((element) => element.open), true);
-  console.log('[ui] PDF merge order, vector page preservation, and keyboard FAQ disclosure verified');
+
+  // Issue 8: Hold transition callbacks to exercise Merge PDFs starting before an async reorder/remove commits
+  const gammaPdf = await makePdf('gamma document', 500);
+  for (const edit of ['reorder', 'remove']) {
+    await page.goto(`${baseURL}/tools/pdf-merger/`, { waitUntil: 'networkidle' });
+    await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles([
+      { name: 'alpha.pdf', mimeType: 'application/pdf', buffer: alphaPdf },
+      { name: 'beta.pdf', mimeType: 'application/pdf', buffer: betaPdf },
+      { name: 'gamma.pdf', mimeType: 'application/pdf', buffer: gammaPdf },
+    ]);
+    await page.waitForFunction(() => {
+      const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Merge PDFs');
+      return Boolean(button && !button.disabled);
+    });
+    await page.evaluate(async (action) => {
+      const original = document.startViewTransition;
+      let release;
+      const ready = new Promise((resolve) => {
+        release = resolve;
+      });
+      if (original) document.startViewTransition = (update) => original.call(document, () => ready.then(update));
+      try {
+        const label = action === 'reorder' ? 'Move gamma.pdf up' : 'Remove alpha.pdf';
+        document.querySelector(`button[aria-label="${label}"]`).click();
+        await Promise.resolve();
+        [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Merge PDFs').click();
+      } finally {
+        release();
+        document.startViewTransition = original;
+      }
+    }, edit);
+    const outputLink = page.getByRole('link', { name: 'Download merged PDF' });
+    await outputLink.waitFor({ timeout: 30_000 });
+    const downloadPromise = page.waitForEvent('download');
+    await outputLink.click();
+    const download = await downloadPromise;
+    const outputPath = path.join(tempRoot, `rapid-${edit}.pdf`);
+    await download.saveAs(outputPath);
+    const output = await PDFDocument.load(fs.readFileSync(outputPath));
+    const expectedWidths = edit === 'reorder' ? [300, 500, 400] : [400, 500];
+    const expectedNames = edit === 'reorder' ? ['alpha.pdf', 'gamma.pdf', 'beta.pdf'] : ['beta.pdf', 'gamma.pdf'];
+    assert.deepEqual(await page.locator('ol li p.truncate').allTextContents(), expectedNames, 'The file list should reflect the latest edit.');
+    assert.deepEqual(
+      output.getPages().map((pdfPage) => pdfPage.getWidth()),
+      expectedWidths,
+      `A merge immediately after ${edit} must use the latest inputs.`,
+    );
+  }
+  console.log('[ui] PDF merge order, vector page preservation, keyboard FAQ disclosure, and rapid reorder/removal race guards verified');
 
   // Media Converter drag state
   await page.goto(`${baseURL}/tools/media-converter/`, { waitUntil: 'networkidle' });

@@ -3,7 +3,7 @@ export const meta = {
   name: 'Line Diff & Patch Inspector',
   description: 'Compare two config, code, or text revisions locally and generate a clean unified + / - line diff.',
   useCase: 'Compare before/after config or code snippets offline using LCS unified diff.',
-  codePreview: '- timeout: 3000\n+ timeout: 8000',
+  codePreview: '@@ -1,2 +1,2 @@\n-timeout: 3000\n+timeout: 8000',
   category: 'Text',
   privacy: {
     mode: 'local',

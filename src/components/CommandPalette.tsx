@@ -10,6 +10,8 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   favorites: string[];
   recents: string[];
+  returnFocusRef?: React.MutableRefObject<HTMLElement | null>;
+  shellRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function CommandPalette({
@@ -17,30 +19,48 @@ export function CommandPalette({
   onOpenChange,
   favorites,
   recents,
+  returnFocusRef,
+  shellRef,
 }: CommandPaletteProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const didNavigateRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!open || !dialogRef.current) return;
 
     const dialog = dialogRef.current;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const shell = shellRef?.current;
+    const opener = returnFocusRef?.current ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const previousOverflow = document.body.style.overflow;
+    const previousInert = shell?.inert ?? false;
+    const previousAriaHidden = shell?.getAttribute('aria-hidden') ?? null;
+    didNavigateRef.current = false;
 
-    // showModal makes the rest of the document inert and contains keyboard focus.
+    // The native modal contains focus; the shell also exposes its inert state explicitly.
     document.body.style.overflow = 'hidden';
     dialog.showModal();
     inputRef.current?.focus();
+    if (shell) {
+      shell.inert = true;
+      shell.setAttribute('aria-hidden', 'true');
+    }
 
     return () => {
+      // Close while the shell is inert so native restoration cannot override navigation.
       dialog.close();
       document.body.style.overflow = previousOverflow;
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      if (shell) {
+        shell.inert = previousInert;
+        if (previousAriaHidden === null) shell.removeAttribute('aria-hidden');
+        else shell.setAttribute('aria-hidden', previousAriaHidden);
+      }
+      if (!didNavigateRef.current && opener?.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [open, returnFocusRef, shellRef]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -48,12 +68,15 @@ export function CommandPalette({
         event.preventDefault();
         event.stopPropagation();
         if (event.repeat) return;
+        if (!open && returnFocusRef) {
+          returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }
         onOpenChange(!open);
       }
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, returnFocusRef]);
 
   useEffect(() => {
     if (!open) setQuery('');
@@ -100,6 +123,7 @@ export function CommandPalette({
   );
 
   const handleSelect = (slug: string) => {
+    didNavigateRef.current = true;
     onOpenChange(false);
     navigate(`/tools/${slug}`);
   };
@@ -108,6 +132,8 @@ export function CommandPalette({
     <dialog
       ref={dialogRef}
       className="command-palette-dialog fixed inset-0 m-0 h-[100dvh] max-h-none w-screen max-w-none overflow-y-auto border-0 bg-transparent p-0 text-ink"
+      role="dialog"
+      aria-modal="true"
       aria-label="Command palette"
       onCancel={(event) => {
         event.preventDefault();

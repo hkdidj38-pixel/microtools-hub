@@ -78,13 +78,13 @@ test('cancelling a stale regex run terminates it and ignores an already queued r
   assert.equal(worker.onmessage, null);
 });
 
-test('an unresponsive regex worker is terminated at the one-second deadline', async () => {
+test('an unresponsive regex worker is terminated at the 450ms deadline', async () => {
   const { run, workers, timers } = loadWorkerClient();
   const pending = run('(a+)+$', 'g', 'a'.repeat(32) + '!');
   const [timer] = timers.values();
-  assert.equal(timer.delay, 1000);
+  assert.equal(timer.delay, 450);
   timer.callback();
-  await assert.rejects(pending, /timed out after 1 second/);
+  await assert.rejects(pending, /timed out after 450ms/);
   assert.equal(workers[0].terminations, 1);
   assert.equal(timers.size, 0);
 

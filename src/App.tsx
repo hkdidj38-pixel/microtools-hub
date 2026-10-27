@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Link, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Search, Star, Terminal, X } from 'lucide-react';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -8,6 +8,7 @@ import { HeroLiveJsonPreview } from '@/components/HeroLiveJsonPreview';
 import { ToolCard } from '@/components/ToolCard';
 import { ToolLayout } from '@/components/ToolLayout';
 import { TOOLS_REGISTRY, type RegisteredTool, type ToolCategory } from '@/lib/registry';
+import { SITE_ORIGIN } from '@/lib/siteConfig';
 import { useToolPreferences } from '@/lib/storage';
 
 const CATEGORY_TABS: Array<'All' | ToolCategory> = [
@@ -79,7 +80,7 @@ function HomePage({
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) metaDesc.setAttribute('content', HOME_DESCRIPTION);
     const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute('href', 'https://microtools-hub-d6l.pages.dev/');
+    if (canonical) canonical.setAttribute('href', `${SITE_ORIGIN}/`);
   }, []);
 
   useEffect(() => {
@@ -422,58 +423,71 @@ function NotFoundPage() {
 
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const { favoriteTools, recentTools, toggleFavorite, markRecent } = useToolPreferences();
+
+  const openCommandPalette = useCallback(() => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      returnFocusRef.current = document.activeElement;
+    }
+    setPaletteOpen(true);
+  }, []);
 
   return (
     <BrowserRouter>
-      <div className="flex min-h-screen flex-col bg-paper text-ink">
+      <div className="min-h-screen bg-paper text-ink">
         <ScrollToTop />
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-[8px] focus:border focus:border-brand focus:bg-surface focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:text-ink"
-        >
-          Skip to workbench
-        </a>
+        <div ref={shellRef} data-app-shell="true" className="flex min-h-screen flex-col">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-[8px] focus:border focus:border-brand focus:bg-surface focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:text-ink"
+          >
+            Skip to workbench
+          </a>
 
-        <SiteHeader
-          onOpenCommandPalette={() => setPaletteOpen(true)}
-          favoritesCount={favoriteTools.length}
-        />
+          <SiteHeader
+            onOpenCommandPalette={openCommandPalette}
+            favoritesCount={favoriteTools.length}
+          />
 
-        <main id="main-content" className="flex-1">
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <HomePage
-                  onOpenCommandPalette={() => setPaletteOpen(true)}
-                  favorites={favoriteTools}
-                  recents={recentTools}
-                  onToggleFavorite={toggleFavorite}
-                />
-              }
-            />
-            <Route
-              path="/tools/:slug"
-              element={
-                <ToolRoute
-                  favorites={favoriteTools}
-                  onToggleFavorite={toggleFavorite}
-                  onRecordRecent={markRecent}
-                />
-              }
-            />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </main>
+          <main id="main-content" className="flex-1">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <HomePage
+                    onOpenCommandPalette={openCommandPalette}
+                    favorites={favoriteTools}
+                    recents={recentTools}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                }
+              />
+              <Route
+                path="/tools/:slug"
+                element={
+                  <ToolRoute
+                    favorites={favoriteTools}
+                    onToggleFavorite={toggleFavorite}
+                    onRecordRecent={markRecent}
+                  />
+                }
+              />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </main>
 
-        <SiteFooter />
+          <SiteFooter />
+        </div>
 
         <CommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
           favorites={favoriteTools}
           recents={recentTools}
+          returnFocusRef={returnFocusRef}
+          shellRef={shellRef}
         />
       </div>
     </BrowserRouter>

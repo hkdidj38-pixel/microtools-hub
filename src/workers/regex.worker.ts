@@ -1,5 +1,5 @@
 import { evaluateRegex } from '@/lib/devToolsLogic';
-import type { RegexEvaluation, RegexRequest } from './workerClient';
+import type { RegexEvaluation, RegexRequest } from '../tools/regex-tester/workerClient';
 
 self.onmessage = (event: MessageEvent<RegexRequest>) => {
   const { pattern, flags, corpus } = event.data;

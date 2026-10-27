@@ -1,65 +1,122 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 export const FAVORITES_STORAGE_KEY = 'favoriteTools';
 export const RECENT_STORAGE_KEY = 'recentTools';
-const STORAGE_SYNC_EVENT = 'microtools:storage-sync';
 const LOCAL_PULSE_EVENT = 'microtools:local-pulse';
 const MAX_RECENT = 8;
+const EMPTY_ARRAY: string[] = [];
 
-function readStringArray(key: string): string[] {
-  if (typeof window === 'undefined') return [];
+let favoritesCache: string[] | null = null;
+let recentsCache: string[] | null = null;
+const listeners = new Set<() => void>();
+
+function readStorageArray(key: string): string[] {
+  if (typeof window === 'undefined') return EMPTY_ARRAY;
   try {
     const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
+    if (!raw) return EMPTY_ARRAY;
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    if (!Array.isArray(parsed)) return EMPTY_ARRAY;
+    const filtered = parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    return filtered.length > 0 ? filtered : EMPTY_ARRAY;
   } catch {
-    return [];
+    return EMPTY_ARRAY;
   }
 }
 
-function writeStringArray(key: string, values: string[]): void {
+function persistBestEffort(key: string, values: string[]): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(key, JSON.stringify(values));
-    window.dispatchEvent(new CustomEvent(STORAGE_SYNC_EVENT));
   } catch {
-    // Ignore quota or disabled-storage errors cleanly.
+    // Storage may be blocked or full; in-memory state remains authoritative for this session.
   }
 }
 
+function emitStoreChange(): void {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+function getFavoritesSnapshot(): string[] {
+  if (favoritesCache === null) {
+    favoritesCache = readStorageArray(FAVORITES_STORAGE_KEY);
+  }
+  return favoritesCache;
+}
+
+function getRecentsSnapshot(): string[] {
+  if (recentsCache === null) {
+    recentsCache = readStorageArray(RECENT_STORAGE_KEY);
+  }
+  return recentsCache;
+}
+
+function getServerSnapshot(): string[] {
+  return EMPTY_ARRAY;
+}
+
+function onWindowStorage(event: StorageEvent): void {
+  if (event.key === null || event.key === FAVORITES_STORAGE_KEY) {
+    favoritesCache = readStorageArray(FAVORITES_STORAGE_KEY);
+    emitStoreChange();
+  }
+  if (event.key === null || event.key === RECENT_STORAGE_KEY) {
+    recentsCache = readStorageArray(RECENT_STORAGE_KEY);
+    emitStoreChange();
+  }
+}
+
+function subscribePreferences(listener: () => void): () => void {
+  const wasEmpty = listeners.size === 0;
+  listeners.add(listener);
+
+  if (typeof window !== 'undefined' && wasEmpty) {
+    window.addEventListener('storage', onWindowStorage);
+  }
+
+  return () => {
+    listeners.delete(listener);
+    if (typeof window !== 'undefined' && listeners.size === 0) {
+      window.removeEventListener('storage', onWindowStorage);
+    }
+  };
+}
+
 export function toggleFavoriteSlug(slug: string): string[] {
-  const current = readStringArray(FAVORITES_STORAGE_KEY);
+  const current = getFavoritesSnapshot();
   const exists = current.includes(slug);
   const next = exists ? current.filter((item) => item !== slug) : [slug, ...current];
-  writeStringArray(FAVORITES_STORAGE_KEY, next);
-  return next;
+  favoritesCache = next.length > 0 ? next : EMPTY_ARRAY;
+  persistBestEffort(FAVORITES_STORAGE_KEY, favoritesCache);
+  emitStoreChange();
+  return favoritesCache;
 }
 
 export function recordRecentSlug(slug: string): string[] {
-  const current = readStringArray(RECENT_STORAGE_KEY);
+  const current = getRecentsSnapshot();
   const next = [slug, ...current.filter((item) => item !== slug)].slice(0, MAX_RECENT);
-  writeStringArray(RECENT_STORAGE_KEY, next);
-  return next;
+  if (next.length === current.length && next.every((val, idx) => val === current[idx])) {
+    return current;
+  }
+  recentsCache = next;
+  persistBestEffort(RECENT_STORAGE_KEY, recentsCache);
+  emitStoreChange();
+  return recentsCache;
 }
 
 export function useToolPreferences() {
-  const [favoriteTools, setFavoriteTools] = useState<string[]>(() => readStringArray(FAVORITES_STORAGE_KEY));
-  const [recentTools, setRecentTools] = useState<string[]>(() => readStringArray(RECENT_STORAGE_KEY));
-
-  useEffect(() => {
-    const sync = () => {
-      setFavoriteTools(readStringArray(FAVORITES_STORAGE_KEY));
-      setRecentTools(readStringArray(RECENT_STORAGE_KEY));
-    };
-    window.addEventListener(STORAGE_SYNC_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener(STORAGE_SYNC_EVENT, sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
+  const favoriteTools = useSyncExternalStore(
+    subscribePreferences,
+    getFavoritesSnapshot,
+    getServerSnapshot,
+  );
+  const recentTools = useSyncExternalStore(
+    subscribePreferences,
+    getRecentsSnapshot,
+    getServerSnapshot,
+  );
 
   const toggleFavorite = useCallback((slug: string) => {
     toggleFavoriteSlug(slug);

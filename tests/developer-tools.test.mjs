@@ -125,6 +125,11 @@ test('File hashes preserve binary bytes, UTF-8 BOMs, and empty files', async () 
     }
   }
   assert.equal((await logic.computeHashes('')).output, '');
+
+  const sliced = Uint8Array.from([0x11, 0xff, 0x00, 0x22]).subarray(1, 3);
+  const slicedResult = await logic.computeByteHashes(sliced, 'hex', 'slice.bin');
+  assert.ok(slicedResult.output.includes(createHash('sha256').update(sliced).digest('hex')));
+  assert.match(slicedResult.detail, /slice\.bin \(2 raw bytes\)/);
 });
 
 test('UUID v4, ULID, and CSPRNG token generator produces valid formats', () => {
@@ -222,6 +227,7 @@ test('Regex evaluator, timestamp converter, case transformer, diff, and word met
   assert.equal(slug.output, 'creme-brulee-cafe');
 
   const diff = logic.computeLineDiff('alpha\nbeta\n===\nalpha\ngamma');
+  assert.match(diff.output, /^--- a\/original\n\+\+\+ b\/original\n@@ -1,2 \+1,2 @@/m);
   assert.match(diff.output, /^-beta$/m);
   assert.match(diff.output, /^\+gamma$/m);
 
@@ -247,13 +253,15 @@ test('Exported unified patches apply exactly, including whitespace and final-new
     ['alpha\r\nbeta\r\n', 'alpha\r\ngamma\r\n'],
     ['alpha\nbeta\n', 'alpha\r\nbeta\r\n'],
     ['first\n', 'first\n===\nlast\n'],
+    ['', 'new', '===\nnew'],
+    ['old', '', 'old\n==='],
   ];
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-diff-'));
   try {
-    for (const [original, modified] of samples) {
-      const result = logic.computeLineDiff(`${original}\n===\n${modified}`);
+    for (const [original, modified, explicitInput] of samples) {
+      const result = logic.computeLineDiff(explicitInput ?? `${original}\n===\n${modified}`);
       assert.equal(result.error, null);
-      assert.match(result.output, /^@@ -\d+,\d+ \+\d+,\d+ @@$/m);
+      assert.match(result.output, /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@$/m);
       fs.writeFileSync(path.join(directory, 'original'), original);
       fs.writeFileSync(path.join(directory, 'change.patch'), result.output);
       execFileSync('git', ['apply', '--check', '--whitespace=nowarn', 'change.patch'], { cwd: directory });
@@ -267,6 +275,112 @@ test('Exported unified patches apply exactly, including whitespace and final-new
   const unchanged = logic.computeLineDiff('same\n===\nsame');
   assert.equal(unchanged.error, null);
   assert.equal(unchanged.output, '');
+  assert.equal(logic.computeLineDiff('===').output, '');
+
+  for (const [original, modified] of [
+    ['x\n'.repeat(501), ''],
+    ['', 'x\n'.repeat(501)],
+  ]) {
+    assert.match(logic.computeLineDiff(`${original}\n===\n${modified}`).error, /matrix cap/);
+  }
+});
+
+test('Unified patches keep separate context hunks and apply distant changes exactly', () => {
+  const original = Array.from({ length: 30 }, (_, index) => `line ${index}\n`).join('');
+  const modified = original.replace('line 2\n', 'changed 2\n').replace('line 26\n', 'changed 26\n');
+  const result = logic.computeLineDiff(`${original}\n===\n${modified}`);
+  assert.equal(result.error, null);
+  assert.equal(result.output.match(/^@@ /gm).length, 2);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-diff-context-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'original'), original);
+    fs.writeFileSync(path.join(directory, 'change.patch'), result.output);
+    execFileSync('git', ['apply', '--check', 'change.patch'], { cwd: directory });
+    execFileSync('git', ['apply', 'change.patch'], { cwd: directory });
+    assert.equal(fs.readFileSync(path.join(directory, 'original'), 'utf8'), modified);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('PR #39 regressions: Unicode regex lastIndex, astral HTML entities, full named entities, URL prototype safety, raw byte SHA, component + decode, astral char count, and git-apply unified diff', async () => {
+  // Issue 1: zero-length regex with u/v flags advances across surrogate pairs cleanly
+  const emptyUnicode = logic.evaluateRegex('(?:)', 'gu', '😀');
+  assert.equal(emptyUnicode.error, null);
+  const unicodeMatches = JSON.parse(emptyUnicode.output);
+  assert.equal(unicodeMatches.length, 2);
+  assert.deepEqual(
+    unicodeMatches.map((m) => m.index),
+    [0, 2],
+  );
+
+  // Issue 2: astral emoji encodes as single supplementary code point entity &#x1F600;
+  const emojiEncoded = logic.transformHtmlEntities('Deploy 😀 <ok>', 'encode');
+  assert.equal(emojiEncoded.error, null);
+  assert.equal(emojiEncoded.output, 'Deploy &#x1F600; &lt;ok&gt;');
+  assert.equal(logic.transformHtmlEntities(emojiEncoded.output, 'decode').output, 'Deploy 😀 <ok>');
+
+  // Issue 3: common HTML4/HTML5 named entities decode accurately & unknown names surface in detail
+  const namedDecoded = logic.transformHtmlEntities(
+    'Caf&eacute; &mdash; &hellip; &trade; &euro; &alpha; &rarr; &spades;',
+    'decode',
+  );
+  assert.equal(namedDecoded.output, 'Café — … ™ € α → ♠');
+  assert.equal(namedDecoded.detail, 'Entities unescaped to UTF-8');
+
+  const unknownNamed = logic.transformHtmlEntities('hello &notarealentity; &eacute;', 'decode');
+  assert.equal(unknownNamed.output, 'hello &notarealentity; é');
+  assert.match(unknownNamed.detail ?? '', /unrecognized entity ref \(&notarealentity;\)/);
+
+  // Issue 4: URL query parser handles Object.prototype property names safely
+  const protoUrl = logic.transformUrl(
+    'https://api.example.dev/check?constructor=val1&toString=a&toString=b&__proto__=safe',
+    'parse',
+  );
+  assert.equal(protoUrl.error, null);
+  const parsedUrl = JSON.parse(protoUrl.output);
+  assert.equal(parsedUrl.query.constructor, 'val1');
+  assert.deepEqual(parsedUrl.query.toString, ['a', 'b']);
+  assert.equal(parsedUrl.query.__proto__, 'safe');
+  assert.equal(({}).polluted, undefined);
+
+  // Issue 6: computeByteHashes digests exact raw bytes (BOM + null + high bytes) without UTF-8 coercion
+  const rawBytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x00, 0xff, 0xfe, 0x61]);
+  const expectedRawSha256 = createHash('sha256').update(Buffer.from(rawBytes)).digest('hex');
+  const rawDigestRes = await logic.computeByteHashes(rawBytes, 'hex', 'fixture.bin');
+  assert.equal(rawDigestRes.error, null);
+  assert.ok(rawDigestRes.output.includes(expectedRawSha256));
+  assert.match(rawDigestRes.detail ?? '', /fixture\.bin \(7 raw bytes\)/);
+
+  // Issue 7: URL Decode Component preserves literal '+' characters
+  const decodedComponent = logic.transformUrl('a+b%2Bc%20d', 'decode');
+  assert.equal(decodedComponent.error, null);
+  assert.equal(decodedComponent.output, 'a+b+c d');
+
+  // Issue 9: analyzeTextMetrics counts supplementary code points consistently with/without whitespace
+  const emojiMetrics = JSON.parse(logic.analyzeTextMetrics('😀 a 😀').output);
+  assert.equal(emojiMetrics.characters, 5);
+  assert.equal(emojiMetrics.characters_no_whitespace, 3);
+
+  // Issue 14: computeLineDiff produces standard unified diffs accepted by `git apply --check`
+  const origLines = ['line1', 'line2', 'timeout: 3000', 'line4', 'line5', 'line6', 'line7', 'old: true', 'line9'].join('\n');
+  const modLines = ['line1', 'line2', 'timeout: 8000', 'line4', 'line5', 'line6', 'line7', 'old: false', 'added: 1', 'line9'].join('\n');
+  const patchRes = logic.computeLineDiff(`${origLines}\n===\n${modLines}`);
+  assert.equal(patchRes.error, null);
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microtools-diff-'));
+  try {
+    const patchContent = patchRes.output
+      .replace('--- a/original', '--- a/sample.txt')
+      .replace('+++ b/original', '+++ b/sample.txt');
+    fs.writeFileSync(path.join(tmpDir, 'sample.txt'), origLines, 'utf8');
+    fs.writeFileSync(path.join(tmpDir, 'changes.diff'), patchContent, 'utf8');
+    execFileSync('git', ['apply', '--check', 'changes.diff'], { cwd: tmpDir, stdio: 'pipe' });
+    execFileSync('git', ['apply', 'changes.diff'], { cwd: tmpDir, stdio: 'pipe' });
+    assert.equal(fs.readFileSync(path.join(tmpDir, 'sample.txt'), 'utf8'), modLines);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('All 16 tool meta.ts files have zero imports and complete metadata', () => {
@@ -300,4 +414,12 @@ test('All 16 tool meta.ts files have zero imports and complete metadata', () => 
 
   assert.equal(localCount, 15);
   assert.equal(edgeCount, 1);
+  // Issue 13: Client SEO components must derive SITE_ORIGIN from shared siteConfig (SITE_URL) rather than hardcoding pages.dev
+  const appSrc = fs.readFileSync(path.resolve('src/App.tsx'), 'utf8');
+  const layoutSrc = fs.readFileSync(path.resolve('src/components/ToolLayout.tsx'), 'utf8');
+  const viteSrc = fs.readFileSync(path.resolve('vite.config.ts'), 'utf8');
+  assert.ok(!appSrc.includes('microtools-hub-d6l.pages.dev'), 'App.tsx must use SITE_ORIGIN rather than hardcoding pages.dev');
+  assert.ok(!layoutSrc.includes('microtools-hub-d6l.pages.dev'), 'ToolLayout.tsx must use SITE_ORIGIN rather than hardcoding pages.dev');
+  assert.match(viteSrc, /__SITE_ORIGIN__/);
+  assert.match(viteSrc, /process\.env\.SITE_URL/);
 });

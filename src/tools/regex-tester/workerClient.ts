@@ -10,7 +10,7 @@ export interface RegexEvaluation extends TransformOutcome {
   execMs: number;
 }
 
-const EVALUATION_TIMEOUT_MS = 1000;
+const EVALUATION_TIMEOUT_MS = 450;
 
 export function runRegexInWorker(
   pattern: string,
@@ -21,10 +21,10 @@ export function runRegexInWorker(
   if (signal?.aborted) return Promise.reject(new DOMException('Regex evaluation cancelled.', 'AbortError'));
 
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./regex.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('../../workers/regex.worker.ts', import.meta.url), { type: 'module' });
     let finished = false;
     const timeout = window.setTimeout(() => {
-      fail(new Error('Regex evaluation timed out after 1 second. Simplify the pattern or shorten the test corpus.'));
+      fail(new Error('Regex evaluation timed out after 450ms. Simplify the pattern or shorten the test corpus.'));
     }, EVALUATION_TIMEOUT_MS);
 
     const cleanup = () => {
