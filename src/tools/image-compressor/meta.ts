@@ -2,7 +2,10 @@ export const meta = {
   slug: 'image-compressor',
   name: 'Image Compressor (PNG, JPG, WebP)',
   description: 'Compress PNG, JPG, and WebP images directly in your browser. Private client-side compression with batch ZIP download; savings depend on the image and settings.',
-  category: 'Images',
+  useCase: 'Quantize PNG palettes and compress JPG/WebP batches locally with Web Workers + ZIP export.',
+  codePreview: 'worker.quantize(png) → 1.42 MB → 384 KB (-73%)',
+  popular: true,
+  category: 'Files',
   privacy: {
     mode: 'local',
     label: 'Local image processing',
@@ -14,6 +17,11 @@ export const meta = {
     'tinypng alternative',
     'reduce image size offline',
     'client side image compression',
+  ],
+  steps: [
+    { title: 'Configure quality & max dimensions', detail: 'Adjust target compression ratio (10–100%) and optional pixel bounding box.' },
+    { title: 'Drop up to 50 PNG/JPG/WebP files', detail: 'Web Workers quantize PNGs and re-encode rasters off the main thread.' },
+    { title: 'Save individually or batch .ZIP', detail: 'Built-in size guard retains original bytes whenever re-encoding is larger.' },
   ],
   faqs: [
     {

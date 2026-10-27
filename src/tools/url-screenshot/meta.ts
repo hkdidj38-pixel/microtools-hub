@@ -2,7 +2,9 @@ export const meta = {
   slug: 'url-screenshot',
   name: 'URL Metadata & Edge Telemetry Inspector',
   description: 'Inspect an approved HTTPS page’s title, description, response headers, and Cloudflare edge region telemetry through a fail-closed edge path. Secure egress configuration is required.',
-  category: 'Developer',
+  useCase: 'Inspect approved HTTPS response headers, HTML title/meta, and Cloudflare colo telemetry.',
+  codePreview: 'HEAD https://example.com → 200 · colo: SJC',
+  category: 'Dev',
   privacy: {
     mode: 'edge',
     label: 'Disclosed edge request',
@@ -14,6 +16,11 @@ export const meta = {
     'http response headers',
     'cloudflare edge telemetry',
     'serverless page metadata',
+  ],
+  steps: [
+    { title: 'Submit an approved HTTPS URL', detail: 'Client and Function guards reject HTTP, credentials, IP literals, and unapproved hosts.' },
+    { title: 'Fail-closed Cloudflare edge fetch', detail: 'Requires an explicit operator-configured egress binding; cookies are never forwarded.' },
+    { title: 'Review headers & edge colo', detail: 'Inspect bounded HTML title/description and allowlisted HTTP response headers.' },
   ],
   faqs: [
     {

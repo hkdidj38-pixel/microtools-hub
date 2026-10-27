@@ -282,9 +282,9 @@ export default function PdfMergerTool() {
         <p className="mt-1 text-xs text-muted">Maximum 50 files · 50 MB each · 150 MB total · {MAX_PDF_BATCH_PAGES.toLocaleString()} pages</p>
       </div>
 
-      {notice && <p className="hub-notification--notice rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 motion-safe:animate-hub-enter" role="status">{notice}</p>}
-      {errorMessage && <p className="hub-notification--error rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert">{errorMessage}</p>}
-      {exceedsPageLimit && <p className="hub-notification--page-limit rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert">The batch cannot exceed {MAX_PDF_BATCH_PAGES.toLocaleString()} pages. Remove files before merging.</p>}
+      {notice && <p className="hub-notification--notice rounded-[8px] border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 motion-safe:animate-hub-enter" role="status">{notice}</p>}
+      {errorMessage && <p className="hub-notification--error rounded-[8px] border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 motion-safe:animate-hub-enter" role="alert">{errorMessage}</p>}
+      {exceedsPageLimit && <p className="hub-notification--page-limit rounded-[8px] border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 motion-safe:animate-hub-enter" role="alert">The batch cannot exceed {MAX_PDF_BATCH_PAGES.toLocaleString()} pages. Remove files before merging.</p>}
 
       {pdfs.length > 0 && (
         <section aria-label="PDF merge order" className="space-y-4 motion-safe:animate-hub-enter">
@@ -292,7 +292,7 @@ export default function PdfMergerTool() {
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">02 · Arrange</p>
               <h2 className="mt-1 text-base font-bold text-ink">Merge order <span className="text-muted">({pdfs.length} files)</span></h2>
-              <p className="mt-0.5 text-xs text-muted">
+              <p className="mt-0.5 font-mono text-xs text-muted">
                 {isEstimating ? 'Calculating page counts…' : `${totalPages} ${totalPages === 1 ? 'page' : 'pages'} · ${formatPdfBytes(totalBytes)} total`}
                 {isEstimating && <LoaderCircle className="ml-1 inline h-3 w-3 animate-spin" aria-hidden="true" />}
               </p>
@@ -300,22 +300,22 @@ export default function PdfMergerTool() {
             <button
               type="button"
               onClick={clearAll}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper"
+              className="hub-button-secondary px-3 py-2 text-xs"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" /> {isMerging ? 'Cancel & clear' : 'Clear all'}
             </button>
           </div>
 
-          <ol className="hub-file-list--pdf divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
+          <ol className="hub-file-list--pdf divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
             {pdfs.map((entry, index) => (
               <li key={entry.id} className="flex min-w-0 items-center gap-3 p-3 sm:gap-4 sm:p-4 motion-safe:animate-hub-card-enter" style={{ animationDelay: `${Math.min(index * 45, 135)}ms` }}>
-                <span className="w-6 shrink-0 text-center text-xs font-semibold text-muted">{index + 1}</span>
-                <FileText className="h-8 w-8 shrink-0 text-rose-600" aria-hidden="true" />
+                <span className="w-6 shrink-0 text-center font-mono text-xs font-semibold text-muted">{index + 1}</span>
+                <FileText className="h-8 w-8 shrink-0 text-brand" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink" title={entry.file.name}>{entry.file.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">
+                  <p className="mt-0.5 font-mono text-xs text-muted">
                     {formatPdfBytes(entry.file.size)} <span aria-hidden="true">·</span>{' '}
-                    {entry.isEstimating ? 'Reading pages…' : entry.error ? <span className="text-red-600">{entry.error}</span> : `${entry.pageCount ?? 0} ${entry.pageCount === 1 ? 'page' : 'pages'}`}
+                    {entry.isEstimating ? 'Reading pages…' : entry.error ? <span className="text-rose-300">{entry.error}</span> : `${entry.pageCount ?? 0} ${entry.pageCount === 1 ? 'page' : 'pages'}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -323,7 +323,7 @@ export default function PdfMergerTool() {
                     type="button"
                     onClick={() => movePdf(index, -1)}
                     disabled={isMerging || index === 0}
-                    className="rounded-lg border border-line p-2 text-muted hover:bg-paper disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-[6px] border border-line bg-paper p-2 text-muted hover:bg-surface-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={`Move ${entry.file.name} up`}
                     title="Move up"
                   ><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
@@ -331,7 +331,7 @@ export default function PdfMergerTool() {
                     type="button"
                     onClick={() => movePdf(index, 1)}
                     disabled={isMerging || index === pdfs.length - 1}
-                    className="rounded-lg border border-line p-2 text-muted hover:bg-paper disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-[6px] border border-line bg-paper p-2 text-muted hover:bg-surface-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={`Move ${entry.file.name} down`}
                     title="Move down"
                   ><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
@@ -339,7 +339,7 @@ export default function PdfMergerTool() {
                     type="button"
                     onClick={() => removePdf(entry.id)}
                     disabled={isMerging}
-                    className="rounded-lg border border-line p-2 text-muted hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-[6px] border border-line bg-paper p-2 text-muted hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={`Remove ${entry.file.name}`}
                     title="Remove PDF"
                   ><X className="h-4 w-4" aria-hidden="true" /></button>
@@ -353,44 +353,44 @@ export default function PdfMergerTool() {
               type="button"
               onClick={() => void mergeAll()}
               disabled={!canMerge}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-line"
+              className="hub-button-accent flex-1 px-5 py-3 text-sm"
             >
               {isMerging ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileText className="h-4 w-4" aria-hidden="true" />}
               {isMerging ? 'Merging PDFs…' : 'Merge PDFs'}
             </button>
             {pdfs.length < 2 && <p className="text-xs text-muted">Add at least two PDF files to merge.</p>}
-            {hasInvalidPdf && <p className="text-xs text-red-600">Remove files that could not be read before merging.</p>}
+            {hasInvalidPdf && <p className="text-xs text-rose-300">Remove files that could not be read before merging.</p>}
           </div>
         </section>
       )}
 
       {isMerging && (
-        <div className="space-y-2 rounded-lg border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
+        <div className="space-y-2 rounded-[10px] border border-brand/25 bg-brand-soft px-4 py-3 text-sm text-ink" role="status" aria-live="polite">
           <div className="flex items-center justify-between gap-3">
             <p className="flex items-center gap-2">
-              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Merging {pdfs.length} files ({totalPages} pages)…
+              <LoaderCircle className="h-4 w-4 animate-spin text-brand" aria-hidden="true" /> Merging {pdfs.length} files ({totalPages} pages)…
             </p>
-            <span className="text-xs font-semibold tabular-nums">{mergeProgress}%</span>
+            <span className="font-mono text-xs font-semibold tabular-nums">{mergeProgress}%</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-brand-soft" role="progressbar" aria-label="PDF merge progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={mergeProgress}>
-            <div className="h-full rounded-full bg-brand transition-[width] duration-fast ease-standard" style={{ width: `${mergeProgress}%` }} />
+          <div className="h-2 overflow-hidden rounded-[6px] bg-paper" role="progressbar" aria-label="PDF merge progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={mergeProgress}>
+            <div className="h-full rounded-[6px] bg-brand transition-[width] duration-fast ease-standard" style={{ width: `${mergeProgress}%` }} />
           </div>
         </div>
       )}
 
       {mergedOutput && (
-        <div className="hub-pdf-result flex flex-col justify-between gap-4 rounded-xl border border-brand/20 bg-brand-soft p-4 motion-safe:animate-hub-enter sm:flex-row sm:items-center sm:p-5" role="status">
+        <div className="hub-pdf-result flex flex-col justify-between gap-4 rounded-[10px] border border-brand/25 bg-surface p-4 motion-safe:animate-hub-enter sm:flex-row sm:items-center sm:p-5" role="status">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden="true" />
             <div>
               <p className="text-sm font-bold text-ink">Your merged PDF is ready</p>
-              <p className="mt-0.5 text-xs text-muted">{mergedOutput.pageCount} {mergedOutput.pageCount === 1 ? 'page' : 'pages'} <span aria-hidden="true">·</span> {formatPdfBytes(mergedOutput.size)}</p>
+              <p className="mt-0.5 font-mono text-xs text-muted">{mergedOutput.pageCount} {mergedOutput.pageCount === 1 ? 'page' : 'pages'} <span aria-hidden="true">·</span> {formatPdfBytes(mergedOutput.size)}</p>
             </div>
           </div>
           <a
             href={mergedOutput.url}
             download="merged-document.pdf"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+            className="hub-button-accent px-4 py-2.5 text-sm"
           ><Download className="h-4 w-4" aria-hidden="true" /> Download merged PDF</a>
         </div>
       )}

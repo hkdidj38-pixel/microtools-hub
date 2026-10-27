@@ -1,165 +1,131 @@
-import React, { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowUpRight, Menu, ShieldCheck, X } from 'lucide-react';
-import type { ToolMeta } from '@/lib/registry';
-import { focusFragmentTarget } from '@/lib/navigation';
-import { BrandMark } from '@/components/BrandMark';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Github, Search, Star } from 'lucide-react';
+import { TOOLS_REGISTRY } from '@/lib/registry';
 
 interface SiteHeaderProps {
-  variant: 'home' | 'tool';
-  privacy?: ToolMeta['privacy'];
+  onOpenCommandPalette: () => void;
+  favoritesCount: number;
 }
 
-const sectionLinks = [
-  { label: 'Explore tools', id: 'toolbox' },
-  { label: 'Classic utilities', id: 'classic-tools' },
-  { label: 'Privacy & data', id: 'privacy' },
-] as const;
-
-export function SiteHeader({ variant, privacy }: SiteHeaderProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const isHome = variant === 'home';
-
-  const privacyBadge = privacy && (
-    <span
-      className={`inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[11px] font-medium leading-tight tracking-tight ${
-        privacy.mode === 'edge'
-          ? 'border-peach-ink/25 bg-peach text-peach-ink'
-          : 'border-brand/20 bg-sage text-brand-dark'
-      }`}
-    >
-      <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      <span className="truncate">{privacy.label}</span>
-    </span>
-  );
-
-  const closeMenu = (restoreFocus = false) => {
-    setIsMenuOpen(false);
-    if (restoreFocus) {
-      window.requestAnimationFrame(() => {
-        menuButtonRef.current?.focus();
-      });
-    }
-  };
-
-  const handleHeaderKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape' && isMenuOpen) {
-      event.preventDefault();
-      closeMenu(true);
-    }
-  };
-
-  const renderSectionLink = (
-    item: (typeof sectionLinks)[number],
-    className: string,
-    onClick?: () => void,
-    trailing?: React.ReactNode,
-  ) => (
-    isHome ? (
-      <a key={item.id} href={`#${item.id}`} onClick={onClick} className={className}>
-        <span>{item.label}</span>
-        {trailing}
-      </a>
-    ) : (
-      <Link key={item.id} to={`/#${item.id}`} onClick={onClick} className={className}>
-        <span>{item.label}</span>
-        {trailing}
-      </Link>
-    )
-  );
+export function SiteHeader({ onOpenCommandPalette, favoritesCount }: SiteHeaderProps) {
+  const location = useLocation();
+  const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
+  const activeTool = TOOLS_REGISTRY.find((t) => normalizedPath === `/tools/${t.slug}`);
+  const isEdgeRoute = activeTool?.privacy.mode === 'edge';
 
   return (
-    <header
-      className="sticky top-0 z-40 border-b border-line/90 bg-paper/90 backdrop-blur-xl"
-      onKeyDown={handleHeaderKeyDown}
-    >
-      <nav
-        className="hub-container flex min-h-16 items-center justify-between gap-3 sm:min-h-[4.5rem]"
-        aria-label="Main navigation"
-      >
+    <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        {/* Left: Custom geometric SVG mark + lowercase mono wordmark */}
         <Link
           to="/"
-          className="group inline-flex min-h-11 min-w-0 shrink-0 items-center gap-2.5 rounded-xl pr-1 sm:gap-3"
-          aria-label="MicroTools Hub home"
+          className="group inline-flex shrink-0 items-center gap-2.5 rounded-[8px] py-1 pr-2 focus:outline-none"
+          aria-label="microtools home"
         >
-          <BrandMark />
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="text-base font-extrabold tracking-[-0.03em] text-ink sm:text-lg">
-              MicroTools<span className="text-brand">.</span>
-            </span>
-            <span
-              className="hidden rounded-full border border-line bg-white/80 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted sm:inline-block"
-              aria-hidden="true"
-            >
-              Hub
-            </span>
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            className="shrink-0"
+          >
+            <defs>
+              <linearGradient id="mt-prism" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#8B5CF6" />
+                <stop offset="100%" stopColor="#EC4899" />
+              </linearGradient>
+            </defs>
+            <rect
+              x="2"
+              y="2"
+              width="20"
+              height="20"
+              rx="5"
+              fill="#151518"
+              stroke="url(#mt-prism)"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M7.5 8.5L11 12L7.5 15.5"
+              stroke="#FAFAFA"
+              strokeWidth="1.65"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12.5 15.5H16.5"
+              stroke="url(#mt-prism)"
+              strokeWidth="1.65"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span className="font-mono text-sm font-semibold tracking-tight text-ink transition-colors group-hover:text-white">
+            microtools
           </span>
         </Link>
 
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <div className="hidden items-center gap-1.5 lg:flex xl:gap-2.5">
-            {sectionLinks.slice(0, isHome ? 2 : 3).map((item) =>
-              renderSectionLink(
-                item,
-                'rounded-xl px-3 py-2 text-sm font-semibold text-muted transition-colors duration-fast ease-standard hover:bg-sage/55 hover:text-ink',
-              ),
-            )}
-            {isHome ? (
-              <a
-                href="#privacy"
-                className="ml-1 inline-flex min-h-10 items-center gap-2 rounded-full border border-brand/25 bg-white px-4 py-2 text-xs font-bold tracking-tight text-ink shadow-sm transition-colors duration-fast ease-standard hover:border-brand hover:bg-sage/60 hover:text-brand-dark"
-              >
-                <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />
-                <span>Privacy first</span>
-              </a>
-            ) : (
-              <div className="ml-1">{privacyBadge}</div>
-            )}
-          </div>
-
-          <button
-            ref={menuButtonRef}
-            type="button"
-            data-site-menu-toggle="true"
-            className="hub-button-secondary min-h-11 min-w-11 gap-2 px-3 text-xs lg:hidden"
-            aria-label={isMenuOpen ? 'Close navigation' : 'Open navigation'}
-            aria-expanded={isMenuOpen}
-            aria-controls="site-mobile-navigation"
-            onClick={() => setIsMenuOpen((open) => !open)}
-          >
-            {isMenuOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Menu className="h-4 w-4" aria-hidden="true" />}
-            <span className="hidden min-[360px]:inline">{isMenuOpen ? 'Close' : 'Menu'}</span>
-          </button>
-        </div>
-      </nav>
-
-      <div id="site-mobile-navigation" className="hub-container pb-3.5 lg:hidden" hidden={!isMenuOpen}>
-        {!isHome && privacyBadge && <div className="mb-2">{privacyBadge}</div>}
-        <nav
-          aria-label="Mobile navigation"
-          className="hub-mobile-menu grid gap-1 rounded-2xl border border-line bg-white p-2 shadow-soft motion-safe:animate-hub-menu-in"
+        {/* Center: Command Palette search trigger */}
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          className="flex h-9 min-w-0 max-w-md flex-1 items-center justify-between gap-2 rounded-[8px] border border-line bg-surface px-2.5 text-xs text-muted transition-colors hover:border-brand/50 hover:bg-surface-hover hover:text-ink sm:gap-3 sm:px-3"
+          aria-label="Open command palette search (Command K)"
         >
-          {sectionLinks.map((item) =>
-            renderSectionLink(
-              item,
-              'flex min-h-11 items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink transition-colors duration-fast ease-standard hover:bg-sage/65 hover:text-brand-dark active:bg-paper',
-              () => {
-                closeMenu();
-                if (isHome) {
-                  const isRepeatedFragment = window.location.hash === `#${item.id}`;
-                  window.requestAnimationFrame(() => {
-                    const target = document.getElementById(item.id);
-                    if (!target) return;
-                    focusFragmentTarget(target);
-                    target.scrollIntoView({ block: 'start', behavior: isRepeatedFragment ? 'instant' : 'auto' });
-                  });
-                }
-              },
-              <ArrowUpRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />,
-            ),
+          <span className="inline-flex min-w-0 items-center gap-2 truncate">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+            <span className="truncate">Search {TOOLS_REGISTRY.length} utilities…</span>
+          </span>
+          <kbd className="hidden shrink-0 items-center gap-0.5 rounded-[5px] border border-line bg-paper px-1.5 py-0.5 font-mono text-[11px] text-muted sm:inline-flex">
+            ⌘K
+          </kbd>
+        </button>
+
+        {/* Right: [100% Local] or [Disclosed Edge] status badge + Favorites + GitHub */}
+        <div className="flex shrink-0 items-center gap-2">
+          {isEdgeRoute ? (
+            <span
+              className="hidden items-center gap-2 rounded-[8px] border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 font-mono text-[11px] font-medium text-amber-200 md:inline-flex"
+              title="This route contacts a fail-closed Cloudflare Function for metadata inspection"
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
+              <span>Disclosed Edge</span>
+            </span>
+          ) : (
+            <span
+              className="hidden items-center gap-2 rounded-[8px] border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-300 md:inline-flex"
+              title="Client-side execution in browser memory"
+            >
+              <span className="hub-local-dot" aria-hidden="true" />
+              <span>100% Local</span>
+            </span>
           )}
-        </nav>
+
+          {favoritesCount > 0 && (
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-line bg-surface px-2.5 font-mono text-xs text-ink transition-colors hover:bg-surface-hover"
+              aria-label={`${favoritesCount} favorite tools — open palette`}
+              title="View starred tools"
+            >
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
+              <span>{favoritesCount}</span>
+            </button>
+          )}
+
+          <a
+            href="https://github.com/hkdidj38-pixel/microtools-hub"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-line bg-surface px-2.5 font-mono text-xs font-medium text-ink transition-colors hover:border-brand/50 hover:bg-surface-hover"
+            aria-label="Star microtools-hub on GitHub"
+          >
+            <Github className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+            <span className="hidden sm:inline">Star</span>
+          </a>
+        </div>
       </div>
     </header>
   );

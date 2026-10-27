@@ -1,70 +1,109 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
-import type { RegisteredTool } from '@/lib/registry';
-import { getCategoryAccent, getToolIcon } from '@/lib/categoryStyles';
+import { ArrowUpRight, Clock3, Star } from 'lucide-react';
+import type { ToolMeta } from '@/lib/registry';
 
 interface ToolCardProps {
-  tool: RegisteredTool;
-  index: number;
+  tool: ToolMeta;
+  isFavorite: boolean;
+  isRecent: boolean;
+  onToggleFavorite: (slug: string) => void;
+  compact?: boolean;
 }
 
-export function ToolCard({ tool, index }: ToolCardProps) {
-  const Icon = getToolIcon(tool.slug);
-  const accent = getCategoryAccent(tool.category);
-  const delay = Math.min(index * 55, 165);
-  const isEdge = tool.privacy.mode === 'edge';
+export function ToolCard({
+  tool,
+  isFavorite,
+  isRecent,
+  onToggleFavorite,
+  compact = false,
+}: ToolCardProps) {
+  const spanClass = !compact && tool.popular ? 'md:col-span-2' : '';
 
   return (
-    <Link
-      to={`/tools/${tool.slug}`}
-      className="hub-tool-card group flex min-w-0 flex-col rounded-hub-card border border-line bg-white p-4 shadow-soft motion-safe:animate-hub-card-enter sm:min-h-[17rem] sm:p-6"
-      style={{
-        animationDelay: `${delay}ms`,
-        ['--card-accent' as string]: accent.borderAccent,
-      }}
+    <article
+      className={`hub-bento-card group flex h-full min-w-0 flex-col justify-between p-5 ${spanClass}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <span
-          className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition-all duration-standard ease-standard sm:h-12 sm:w-12 ${accent.iconSurface} ${accent.iconHover}`}
-        >
-          <Icon
-            className="h-5 w-5 transition-transform duration-standard ease-standard group-hover:-rotate-3 group-hover:scale-105"
-            aria-hidden="true"
-          />
-        </span>
+      <div className="min-w-0">
+        {/* Top Row: Mono category label + recent clock + star + arrow */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-[5px] border border-line bg-paper px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wider text-muted">
+              {tool.category}
+            </span>
+            {tool.popular && !compact && (
+              <span className="rounded-[5px] border border-brand/35 bg-brand-soft px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-ink">
+                POPULAR
+              </span>
+            )}
+            {tool.privacy.mode === 'edge' && (
+              <span className="rounded-[5px] border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-amber-200">
+                EDGE
+              </span>
+            )}
+            {isRecent && (
+              <span
+                className="inline-flex items-center gap-1 font-mono text-[11px] text-muted"
+                title="Recently opened in this browser"
+              >
+                <Clock3 className="h-3 w-3" aria-hidden="true" />
+                <span className="sr-only">Recently used</span>
+              </span>
+            )}
+          </div>
 
-        <div className="flex flex-col items-end gap-1.5 text-right">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] ${accent.badge}`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} aria-hidden="true" />
-            {tool.category}
-          </span>
-          <span className="font-mono text-[10px] tracking-tight text-muted">
-            {isEdge ? 'Edge metadata' : 'Local browser'}
-          </span>
+          <div className="relative z-20 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onToggleFavorite(tool.slug);
+              }}
+              aria-pressed={isFavorite}
+              aria-label={isFavorite ? `Remove ${tool.name} from favorites` : `Save ${tool.name} to favorites`}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-[6px] border transition-colors ${
+                isFavorite
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                  : 'border-line bg-paper text-muted hover:border-brand/50 hover:text-ink'
+              }`}
+            >
+              <Star
+                className={`h-3.5 w-3.5 ${isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+            <ArrowUpRight
+              className="h-4 w-4 text-muted transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-ink"
+              aria-hidden="true"
+            />
+          </div>
         </div>
-      </div>
 
-      <div className="mt-4 min-w-0 flex-1 sm:mt-6">
-        <h3 className="break-words text-lg font-extrabold leading-snug tracking-[-0.02em] text-ink transition-colors duration-fast group-hover:text-brand-dark">
-          {tool.name}
+        {/* Middle: Bold tool name */}
+        <h3 className="mt-3.5 text-base font-semibold tracking-tight text-ink sm:text-lg">
+          <Link
+            to={`/tools/${tool.slug}`}
+            className="after:absolute after:inset-0 after:z-10 focus:outline-none"
+          >
+            {tool.name}
+          </Link>
         </h3>
-        <p className="mt-2 text-sm leading-6 text-muted">{tool.description}</p>
+
+        {/* Bottom: 1-line use case */}
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          {tool.useCase}
+        </p>
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-line/75 pt-3.5 sm:mt-5">
-        <span className="inline-flex items-center gap-2 text-xs font-extrabold tracking-tight text-brand-dark">
-          Open tool
-        </span>
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-paper text-brand-dark transition-colors duration-fast group-hover:bg-sage">
-          <ArrowRight
-            className="h-3.5 w-3.5 shrink-0 transition-transform duration-standard ease-standard group-hover:translate-x-0.5"
-            aria-hidden="true"
-          />
-        </span>
-      </div>
-    </Link>
+      {/* Monospace code snippet preview (no icon wall, no emojis) */}
+      {!compact && (
+        <div className="mt-4 overflow-hidden rounded-[6px] border border-line bg-paper px-3 py-2">
+          <pre className="overflow-x-auto font-mono text-[11px] leading-4 text-muted group-hover:text-ink">
+            <code>{tool.codePreview}</code>
+          </pre>
+        </div>
+      )}
+    </article>
   );
 }

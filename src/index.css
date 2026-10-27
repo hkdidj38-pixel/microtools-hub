@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    color-scheme: light;
+  :root,
+  .dark {
+    color-scheme: dark;
     font-family: var(--hub-font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -22,8 +23,8 @@
     width: 100%;
     min-width: 0;
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
-    background: var(--hub-paper);
+    scroll-padding-top: 4.5rem;
+    background: #0A0A0B;
   }
 
   body {
@@ -34,7 +35,17 @@
     background: var(--hub-paper);
     color: var(--hub-ink);
     font-family: var(--hub-font-sans);
+    font-weight: 400;
     overflow-wrap: anywhere;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--hub-font-heading);
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
 
   #root {
@@ -50,46 +61,20 @@
   }
 
   ::selection {
-    background: var(--hub-sage);
-    color: var(--hub-ink);
+    background: rgb(139 92 246 / 0.35);
+    color: #FAFAFA;
   }
 }
 
-@keyframes hub-float-gentle {
+@keyframes hub-local-pulse {
   0%,
   100% {
-    transform: translate3d(0, 0, 0);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0.55);
   }
   50% {
-    transform: translate3d(0, -5px, 0);
-  }
-}
-
-@keyframes hub-float-chip {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -3.5px, 0);
-  }
-}
-
-@keyframes hub-orbit-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes hub-geo-rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+    opacity: 0.72;
+    box-shadow: 0 0 0 5px rgb(16 185 129 / 0);
   }
 }
 
@@ -99,129 +84,78 @@
   }
 
   .hub-eyebrow {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-brand;
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted;
   }
 
   .hub-input {
-    @apply w-full rounded-hub-control border border-line bg-white px-4 py-3.5 text-sm text-ink shadow-sm placeholder:text-muted transition-colors duration-fast ease-standard focus:border-brand;
+    @apply w-full rounded-hub-input border border-line bg-paper px-3.5 py-2.5 font-mono text-sm text-ink placeholder:text-muted transition-colors duration-fast ease-standard focus:border-brand;
   }
 
+  /* Primary CTA: Zinc-900 with crisp 1px border OR accent gradient — never generic blue */
   .hub-button-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-hub-control bg-brand-dark px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-fast ease-standard hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control border border-white/15 bg-zinc-900 px-4 py-2 text-sm font-medium text-ink transition-all duration-fast ease-standard hover:border-brand/60 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .hub-button-accent {
+    background-image: linear-gradient(135deg, #6D28D9 0%, #BE185D 100%);
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control px-4 py-2 text-sm font-medium text-white transition-opacity duration-fast ease-standard hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .hub-button-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors duration-fast ease-standard hover:border-brand/35 hover:bg-sage/45 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-hub-control border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors duration-fast ease-standard hover:border-brand/50 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45;
   }
 
-  /* Editorial Hero Canvas: restrained botanical washes + crisp architectural grid hairlines */
-  .hub-editorial-canvas {
-    background-color: var(--hub-paper);
+  .hub-accent-gradient-text,
+  .hub-accent-text {
+    background-image: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Technical hairline grid backdrop — no soft blobs */
+  .hub-tech-grid {
+    background-color: #0A0A0B;
     background-image:
-      radial-gradient(46rem 32rem at 86% 18%, rgb(var(--hub-sage-rgb) / 0.72), transparent 70%),
-      radial-gradient(36rem 26rem at 12% 10%, rgb(var(--hub-peach-rgb) / 0.42), transparent 72%),
-      radial-gradient(30rem 24rem at 74% 88%, rgb(var(--hub-lavender-rgb) / 0.36), transparent 70%),
-      linear-gradient(to right, rgb(var(--hub-line-rgb) / 0.42) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(var(--hub-line-rgb) / 0.42) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 100% 100%, 4.5rem 4.5rem, 4.5rem 4.5rem;
+      linear-gradient(to right, rgb(42 42 48 / 0.32) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(42 42 48 / 0.32) 1px, transparent 1px);
+    background-size: 48px 48px;
     background-position: center top;
   }
 
-  /* Smooth search focus input */
-  .hub-search-input {
-    border: 1px solid rgb(var(--hub-line-rgb));
-    background-color: #ffffff;
-    box-shadow: var(--hub-shadow-soft);
+  /* Bento Card: 10px radius, 1px #2A2A30 border, accent border + subtle gradient on hover */
+  .hub-bento-card {
+    position: relative;
+    border-radius: 10px;
+    border: 1px solid #2A2A30;
+    background-color: #151518;
     transition:
-      border-color var(--hub-motion-standard) var(--hub-ease-standard),
+      border-color var(--hub-motion-fast) var(--hub-ease-standard),
+      background-color var(--hub-motion-fast) var(--hub-ease-standard),
       box-shadow var(--hub-motion-standard) var(--hub-ease-emphasized);
   }
 
-  .hub-search-input:hover {
-    border-color: rgb(var(--hub-brand-rgb) / 0.45);
+  .hub-bento-card:hover,
+  .hub-bento-card:focus-within {
+    border-color: rgb(139 92 246 / 0.72);
+    background-color: #1A1A1E;
+    background-image: linear-gradient(145deg, rgb(139 92 246 / 0.08) 0%, rgb(236 72 153 / 0.03) 45%, transparent 100%);
+    box-shadow: 0 0 0 1px rgb(139 92 246 / 0.22), 0 0 24px -8px rgb(139 92 246 / 0.25);
   }
 
-  .hub-search-input:focus:not(:focus-visible) {
-    outline: none;
-    border-color: rgb(var(--hub-brand-rgb));
-    box-shadow:
-      0 0 0 4px rgb(var(--hub-sage-rgb) / 0.85),
-      var(--hub-shadow-lift);
+  .hub-kbd {
+    @apply inline-flex items-center justify-center rounded-[5px] border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] font-medium leading-none text-muted;
   }
 
-  /* Soft floating Quick Access workspace panel (pauses on hover/focus for effortless pointer interaction) */
-  .hub-float-panel {
-    will-change: transform;
-    animation: hub-float-gentle 6.6s ease-in-out infinite;
+  .hub-local-dot {
+    @apply inline-block h-2 w-2 rounded-full bg-success transition-shadow duration-150;
+    animation: hub-local-pulse 2.2s ease-in-out infinite;
   }
 
-  .hub-float-panel:hover,
-  .hub-float-panel:focus-within {
-    animation-play-state: paused;
-  }
-
-  /* Decorative orbit track & floating status chips */
-  .hub-orbit-track {
-    animation: hub-orbit-spin 28s linear infinite;
-  }
-
-  .hub-orbit-track--reverse {
-    animation: hub-orbit-spin 36s linear infinite reverse;
-  }
-
-  .hub-float-chip {
-    animation: hub-float-chip 5.6s ease-in-out infinite;
-  }
-
-  .hub-float-chip--delayed {
-    animation: hub-float-chip 6.8s ease-in-out 1.4s infinite;
-  }
-
-  /* Small rotating geometric accent */
-  .hub-geo-spin {
-    transform-origin: center;
-    animation: hub-geo-rotate 26s linear infinite;
-  }
-
-  /* Editorial Tool Card: top-border reveal + gentle hover elevation */
-  .hub-tool-card {
-    position: relative;
-    overflow: hidden;
-    isolation: isolate;
-    transition:
-      transform var(--hub-motion-standard) var(--hub-ease-emphasized),
-      box-shadow var(--hub-motion-standard) var(--hub-ease-emphasized),
-      border-color var(--hub-motion-fast) var(--hub-ease-standard);
-  }
-
-  .hub-tool-card::before {
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    height: 3px;
-    background: var(--card-accent, var(--hub-brand));
-    content: "";
-    pointer-events: none;
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform var(--hub-motion-standard) var(--hub-ease-emphasized);
-  }
-
-  .hub-tool-card:hover,
-  .hub-tool-card:focus-visible {
-    border-color: rgb(var(--hub-brand-rgb) / 0.32);
-    box-shadow: var(--hub-shadow-lift);
-    transform: translateY(-3px);
-  }
-
-  .hub-tool-card:hover::before,
-  .hub-tool-card:focus-visible::before {
-    transform: scaleX(1);
-  }
-
-  .hub-tool-card:active {
-    transform: translateY(0);
+  .hub-local-dot[data-pulsing="true"],
+  .hub-local-dot--burst {
+    @apply inline-block h-2 w-2 rounded-full bg-success;
+    box-shadow: 0 0 0 4px rgb(16 185 129 / 0.34);
   }
 
   .hub-scroll-reveal {
@@ -232,46 +166,44 @@
 
   .hub-scroll-reveal.hub-reveal-pending {
     opacity: 0;
-    transform: translateY(0.6rem);
+    transform: translateY(8px);
   }
 
-  .hub-scroll-reveal.hub-revealed {
-    opacity: 1;
-    transform: none;
-  }
-
+  .hub-scroll-reveal.hub-revealed,
   .hub-scroll-reveal:focus-within {
     opacity: 1;
     transform: none;
   }
 
-  .hub-filter-chip {
-    position: relative;
-    overflow: hidden;
-    isolation: isolate;
+  /* cmdk Command Palette styling */
+  [cmdk-root] {
+    @apply flex w-full flex-col overflow-hidden rounded-[10px] border border-line bg-surface text-ink;
+    box-shadow: 0 0 0 1px rgb(139 92 246 / 0.25), 0 24px 64px rgb(0 0 0 / 0.75);
   }
 
-  .hub-filter-chip::after {
-    position: absolute;
-    right: 0.9rem;
-    bottom: 0.22rem;
-    left: 0.9rem;
-    height: 2px;
-    border-radius: 999px;
-    background: var(--hub-sage);
-    content: "";
-    pointer-events: none;
-    transform: scaleX(0);
-    transform-origin: center;
-    transition: transform var(--hub-motion-standard) var(--hub-ease-emphasized);
+  [cmdk-input] {
+    @apply w-full border-0 bg-transparent px-3 py-3.5 font-mono text-sm text-ink placeholder:text-muted focus:outline-none;
   }
 
-  .hub-filter-chip[aria-pressed="true"] {
-    view-transition-name: active-category-filter;
+  [cmdk-list] {
+    @apply max-h-[22rem] overflow-y-auto overscroll-contain p-2;
   }
 
-  .hub-filter-chip[aria-pressed="true"]::after {
-    transform: scaleX(1);
+  [cmdk-empty] {
+    @apply py-10 text-center font-mono text-xs text-muted;
+  }
+
+  [cmdk-group-heading] {
+    @apply px-2.5 pb-1.5 pt-2 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-subtle;
+  }
+
+  [cmdk-item] {
+    @apply flex cursor-pointer select-none items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-sm text-ink transition-colors duration-fast;
+  }
+
+  [cmdk-item][data-selected="true"] {
+    @apply bg-surface-hover text-ink;
+    box-shadow: inset 2px 0 0 0 #8B5CF6;
   }
 
   #tool-search-results {
@@ -311,8 +243,6 @@
   }
 }
 
-/* Two-color focus ring: the pale sage inner outline reads on dark surfaces, while
-   the deep olive outer ring reads on light surfaces. */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -320,21 +250,15 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid rgb(var(--hub-focus-inner-rgb));
+  outline: 2px solid rgb(var(--hub-focus-inner-rgb));
   outline-offset: 2px;
-  box-shadow: 0 0 0 7px rgb(var(--hub-focus-outer-rgb));
+  box-shadow: 0 0 0 4px rgb(var(--hub-focus-outer-rgb));
   transition: outline-color var(--hub-motion-fast) var(--hub-ease-standard), box-shadow var(--hub-motion-fast) var(--hub-ease-standard);
 }
 
-::view-transition-group(*) {
-  animation-duration: var(--hub-motion-standard);
-  animation-timing-function: var(--hub-ease-emphasized);
-}
-
-::view-transition-old(*),
-::view-transition-new(*) {
-  animation-duration: var(--hub-motion-standard);
-  animation-timing-function: var(--hub-ease-emphasized);
+[cmdk-input]:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 @media (forced-colors: active) {
@@ -345,7 +269,7 @@ summary:focus-visible,
   textarea:focus-visible,
   summary:focus-visible,
   [tabindex]:focus-visible {
-    outline: 3px solid Highlight;
+    outline: 2px solid Highlight;
     box-shadow: none;
   }
 }
@@ -364,19 +288,8 @@ summary:focus-visible,
     scroll-behavior: auto;
   }
 
-  .hub-float-panel,
-  .hub-orbit-track,
-  .hub-orbit-track--reverse,
-  .hub-float-chip,
-  .hub-float-chip--delayed,
-  .hub-geo-spin {
+  .hub-local-dot {
     animation: none !important;
-    transform: none !important;
-  }
-
-  .hub-tool-card:hover,
-  .hub-tool-card:focus-visible {
-    transform: none !important;
   }
 
   .hub-scroll-reveal,
@@ -385,19 +298,5 @@ summary:focus-visible,
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
-  }
-
-  .hub-dropzone[data-dragging="true"] {
-    transform: none !important;
-  }
-
-  .hub-filter-chip::after {
-    transition: none !important;
-  }
-
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 }

@@ -1,95 +1,94 @@
-/* Shared visual tokens for the React app and standalone utility pages.
-   Palette: Premium Editorial Utility Workspace. */
-:root {
-  --hub-ink-rgb: 32 37 30;
-  /* Tuned from #74796E to #60665C so body/placeholder text achieves >= 5.5:1 WCAG AA contrast on paper and white. */
-  --hub-muted-rgb: 96 102 92;
-  --hub-muted-subtle-rgb: 116 121 110;
-  --hub-paper-rgb: 248 248 243;
-  --hub-surface-rgb: 255 255 255;
-  --hub-line-rgb: 228 230 220;
-  --hub-brand-rgb: 82 100 71;
-  --hub-brand-dark-rgb: 52 71 47;
-  --hub-brand-soft-rgb: 230 236 223;
-  --hub-lime-rgb: 230 236 223;
+/* Shared visual tokens — Linear / Raycast Technical Dark System.
+   React app forces dark mode (:root); standalone legacy pages support [data-theme="light"]. */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
 
-  /* Category-specific muted editorial accents & accessible foreground inks */
-  --hub-sage-rgb: 230 236 223;
-  --hub-sage-ink-rgb: 52 71 47;
-  --hub-lavender-rgb: 235 232 243;
-  --hub-lavender-ink-rgb: 70 59 104;
-  --hub-peach-rgb: 245 232 219;
-  --hub-peach-ink-rgb: 106 67 38;
-  --hub-blue-gray-rgb: 230 237 240;
-  --hub-blue-gray-ink-rgb: 44 76 91;
+  --hub-paper-rgb: 10 10 11;          /* #0A0A0B background */
+  --hub-surface-rgb: 21 21 24;        /* #151518 surface */
+  --hub-surface-hover-rgb: 30 30 34;  /* #1E1E22 surface hover */
+  --hub-line-rgb: 42 42 48;           /* #2A2A30 1px border */
+  --hub-ink-rgb: 250 250 250;         /* #FAFAFA text primary */
+  --hub-muted-rgb: 159 159 169;       /* #9F9FA9 text secondary (7.56:1 on #0A0A0B) */
+  --hub-muted-subtle-rgb: 138 138 148;/* #8A8A94 subtle technical labels */
 
-  --hub-focus-inner-rgb: 215 230 185;
-  --hub-focus-outer-rgb: 52 71 47;
+  --hub-brand-rgb: 139 92 246;        /* #8B5CF6 electric violet accent */
+  --hub-brand-dark-rgb: 124 58 237;   /* #7C3AED pressed/hover violet */
+  --hub-brand-soft-rgb: 29 22 48;     /* subtle violet tint surface */
+  --hub-pink-rgb: 236 72 153;         /* #EC4899 gradient stop */
+  --hub-success-rgb: 16 185 129;      /* #10B981 local proof emerald */
+  --hub-lime-rgb: 16 185 129;
+
+  --hub-focus-inner-rgb: 250 250 250;
+  --hub-focus-outer-rgb: 139 92 246;
 
   --hub-ink: rgb(var(--hub-ink-rgb));
   --hub-muted: rgb(var(--hub-muted-rgb));
   --hub-muted-subtle: rgb(var(--hub-muted-subtle-rgb));
   --hub-paper: rgb(var(--hub-paper-rgb));
   --hub-surface: rgb(var(--hub-surface-rgb));
+  --hub-surface-hover: rgb(var(--hub-surface-hover-rgb));
   --hub-line: rgb(var(--hub-line-rgb));
   --hub-brand: rgb(var(--hub-brand-rgb));
   --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
   --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
+  --hub-success: rgb(var(--hub-success-rgb));
   --hub-lime: rgb(var(--hub-lime-rgb));
-  --hub-sage: rgb(var(--hub-sage-rgb));
-  --hub-lavender: rgb(var(--hub-lavender-rgb));
-  --hub-peach: rgb(var(--hub-peach-rgb));
-  --hub-blue-gray: rgb(var(--hub-blue-gray-rgb));
+  --hub-accent-gradient: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
 
-  /* Self-contained typography stacks — zero external font network requests (CSP 'self' safe) */
-  --hub-font-sans: "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --hub-font-serif: "Playfair Display", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, Cambria, "Times New Roman", Times, serif;
-  --hub-font-mono: "DM Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* Self-contained technical typography (CSP font-src 'self' safe — zero external requests) */
+  --hub-font-heading: "Geist", "Geist Sans", "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --hub-font-sans: "Geist", "Geist Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --hub-font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --hub-gutter: clamp(0.75rem, 3vw, 2rem);
-  --hub-radius-control: 0.875rem;
-  --hub-radius-card: 1.5rem;
-  --hub-radius-panel: 2rem;
-  --hub-type-display: clamp(2.15rem, 5.1vw, 4.15rem);
-  --hub-type-section: clamp(1.75rem, 3vw, 2.5rem);
-  --hub-type-page: clamp(1.85rem, 5vw, 3.25rem);
+  --hub-radius-input: 6px;
+  --hub-radius-control: 8px;
+  --hub-radius-card: 10px;
+  --hub-radius-panel: 10px;
+  --hub-type-display: clamp(2.15rem, 4.8vw, 3.65rem);
+  --hub-type-section: clamp(1.5rem, 2.6vw, 2.1rem);
+  --hub-type-page: clamp(1.65rem, 3.5vw, 2.4rem);
 
-  --hub-motion-fast: 160ms;
-  --hub-motion-standard: 260ms;
-  --hub-motion-reveal: 380ms;
+  --hub-motion-fast: 140ms;
+  --hub-motion-standard: 200ms;
+  --hub-motion-reveal: 280ms;
   --hub-ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
   --hub-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
-  --hub-shadow-soft: 0 12px 34px -8px rgb(32 37 30 / 6%), 0 2px 8px rgb(32 37 30 / 3%);
-  --hub-shadow-lift: 0 20px 44px -10px rgb(32 37 30 / 11%), 0 4px 12px rgb(32 37 30 / 4%);
-  --hub-shadow-panel: 0 24px 56px -14px rgb(32 37 30 / 9%), 0 2px 10px rgb(32 37 30 / 3%);
+
+  /* No soft shadows: crisp 1px border + subtle glow on hover */
+  --hub-shadow-soft: none;
+  --hub-shadow-lift: 0 0 0 1px rgb(139 92 246 / 0.38), 0 0 26px -6px rgb(139 92 246 / 0.22);
+  --hub-shadow-panel: 0 0 0 1px rgb(42 42 48 / 0.9);
 }
 
-[data-theme="dark"] {
-  --hub-ink-rgb: 238 242 233;
-  --hub-muted-rgb: 166 176 161;
-  --hub-muted-subtle-rgb: 140 150 135;
-  --hub-paper-rgb: 19 24 19;
-  --hub-surface-rgb: 27 34 27;
-  --hub-line-rgb: 51 62 50;
-  --hub-brand-rgb: 178 205 156;
-  --hub-brand-dark-rgb: 204 226 186;
-  --hub-brand-soft-rgb: 40 52 39;
-  --hub-lime-rgb: 212 228 176;
-  --hub-focus-inner-rgb: 212 228 176;
-  --hub-focus-outer-rgb: 178 205 156;
+/* Retained for standalone public/<slug>/ utilities that offer a theme toggle */
+[data-theme="light"] {
+  color-scheme: light;
+  --hub-paper-rgb: 249 249 251;
+  --hub-surface-rgb: 255 255 255;
+  --hub-surface-hover-rgb: 243 243 247;
+  --hub-line-rgb: 226 226 233;
+  --hub-ink-rgb: 18 18 23;
+  --hub-muted-rgb: 82 82 95;
+  --hub-muted-subtle-rgb: 113 113 126;
+  --hub-brand-rgb: 109 40 217;
+  --hub-brand-dark-rgb: 91 33 182;
+  --hub-brand-soft-rgb: 243 238 255;
+  --hub-lime-rgb: 16 185 129;
+  --hub-focus-inner-rgb: 255 255 255;
+  --hub-focus-outer-rgb: 109 40 217;
 
   --hub-ink: rgb(var(--hub-ink-rgb));
   --hub-muted: rgb(var(--hub-muted-rgb));
-  --hub-muted-subtle: rgb(var(--hub-muted-subtle-rgb));
   --hub-paper: rgb(var(--hub-paper-rgb));
   --hub-surface: rgb(var(--hub-surface-rgb));
+  --hub-surface-hover: rgb(var(--hub-surface-hover-rgb));
   --hub-line: rgb(var(--hub-line-rgb));
   --hub-brand: rgb(var(--hub-brand-rgb));
   --hub-brand-dark: rgb(var(--hub-brand-dark-rgb));
   --hub-brand-soft: rgb(var(--hub-brand-soft-rgb));
   --hub-lime: rgb(var(--hub-lime-rgb));
-
-  --hub-shadow-soft: 0 16px 40px rgb(0 0 0 / 22%);
-  --hub-shadow-lift: 0 22px 48px rgb(0 0 0 / 32%);
-  --hub-shadow-panel: 0 26px 56px rgb(0 0 0 / 34%);
+  --hub-shadow-soft: none;
+  --hub-shadow-lift: 0 0 0 1px rgb(109 40 217 / 0.35);
 }
