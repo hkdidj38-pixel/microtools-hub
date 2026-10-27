@@ -1,7 +1,8 @@
 export const meta = {
   slug: 'url-screenshot',
   name: 'URL Metadata & Edge Telemetry Inspector',
-  description: 'Inspect an approved HTTPS page’s title, description, response headers, and Cloudflare edge region telemetry through a fail-closed edge path. Secure egress configuration is required.',
+  description:
+    'Inspect an approved HTTPS URL’s title, meta tags, headers, and Cloudflare edge region via a fail-closed edge function. Requires secure egress config.',
   useCase: 'Inspect approved HTTPS response headers, HTML title/meta, and Cloudflare colo telemetry.',
   codePreview: 'HEAD https://example.com → 200 · colo: SJC',
   category: 'Dev',

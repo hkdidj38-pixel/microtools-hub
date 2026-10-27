@@ -8,6 +8,14 @@ import { HeroLiveJsonPreview } from '@/components/HeroLiveJsonPreview';
 import { ToolCard } from '@/components/ToolCard';
 import { ToolLayout } from '@/components/ToolLayout';
 import { TOOLS_REGISTRY, type RegisteredTool, type ToolCategory } from '@/lib/registry';
+import {
+  HOME_DESCRIPTION,
+  HOME_TITLE,
+  NOT_FOUND_DESCRIPTION,
+  NOT_FOUND_TITLE,
+  applyPageSeo,
+  buildHomeJsonLd,
+} from '@/lib/seo';
 import { SITE_ORIGIN } from '@/lib/siteConfig';
 import { useToolPreferences } from '@/lib/storage';
 
@@ -19,10 +27,6 @@ const CATEGORY_TABS: Array<'All' | ToolCategory> = [
   'Security',
   'Files',
 ];
-
-const HOME_TITLE = 'MicroTools Hub — Private Browser-Native Developer Utilities';
-const HOME_DESCRIPTION =
-  '15+ developer utilities that execute locally in your browser with WebCrypto, Web Workers, and verified WASM. Zero file uploads, zero telemetry, instant Command+K navigation.';
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -76,12 +80,14 @@ function HomePage({
   }, [searchParams]);
 
   useEffect(() => {
-    document.title = HOME_TITLE;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute('content', HOME_DESCRIPTION);
-    const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute('href', `${SITE_ORIGIN}/`);
-  }, []);
+    applyPageSeo({
+      title: HOME_TITLE,
+      description: HOME_DESCRIPTION,
+      canonicalUrl: `${SITE_ORIGIN}/`,
+      robots: 'index, follow',
+      jsonLd: buildHomeJsonLd(TOOLS_REGISTRY, SITE_ORIGIN),
+    });
+  }, [searchParams]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -402,7 +408,13 @@ function ToolRoute({
 
 function NotFoundPage() {
   useEffect(() => {
-    document.title = '404 — Route Not Found | MicroTools Hub';
+    applyPageSeo({
+      title: NOT_FOUND_TITLE,
+      description: NOT_FOUND_DESCRIPTION,
+      canonicalUrl: null,
+      robots: 'noindex, nofollow',
+      jsonLd: null,
+    });
   }, []);
 
   return (

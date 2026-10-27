@@ -162,16 +162,27 @@ try {
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
-  // 1. SEO, SSR Prerendering, Dark Shell (zero blank page flash), Sitemap & Robots
+  // 1. SEO, SSR Prerendering, Dark Shell (zero blank page flash), Sitemap, Robots, 404 & GSC Verification
   const sitemapRes = await fetch(`${baseURL}/sitemap.xml`);
   assert.equal(sitemapRes.status, 200, 'sitemap.xml must be served.');
   const sitemapXml = await sitemapRes.text();
   assert.match(sitemapXml, /<loc>https:\/\/microtools-hub-d6l\.pages\.dev\/tools\/json-formatter<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/microtools-hub-d6l\.pages\.dev\/tools\/jwt-decoder<\/loc>/);
+  assert.ok(!sitemapXml.includes('<loc>https://microtools-hub-d6l.pages.dev/json-formatter/</loc>'), 'Legacy duplicate routes must be excluded from sitemap.xml.');
 
   const robotsRes = await fetch(`${baseURL}/robots.txt`);
   assert.equal(robotsRes.status, 200, 'robots.txt must be served.');
   assert.match(await robotsRes.text(), /Sitemap:\s*https:\/\/microtools-hub-d6l\.pages\.dev\/sitemap\.xml/);
+
+  const gscRes = await fetch(`${baseURL}/googlecca6cea465225adc.html`);
+  assert.equal(gscRes.status, 200, 'Google Search Console HTML verification file must be served.');
+  assert.match(await gscRes.text(), /google-site-verification:\s*googlecca6cea465225adc\.html/);
+
+  const notFoundHtmlRes = await fetch(`${baseURL}/404.html`);
+  assert.equal(notFoundHtmlRes.status, 200);
+  const notFoundStaticHtml = await notFoundHtmlRes.text();
+  assert.match(notFoundStaticHtml, /<meta\s+name="robots"\s+content="noindex,\s*nofollow"/i);
+  assert.ok(!notFoundStaticHtml.includes('rel="canonical"'), '404.html must not contain a canonical URL.');
 
   const prerenderContext = await browser.newContext({
     javaScriptEnabled: false,
@@ -190,9 +201,33 @@ try {
     await prerenderPage.title(),
     'JSON Formatter & Validator - Private, Offline & Free | MicroTools Hub',
   );
+  assert.equal(await prerenderPage.locator('script[type="application/ld+json"]').count(), 1);
   const jsonLdRaw = await prerenderPage.locator('script[type="application/ld+json"]').first().textContent();
-  assert.ok(jsonLdRaw && jsonLdRaw.includes('SoftwareApplication') && jsonLdRaw.includes('FAQPage'));
-  console.log('[ui] SSR prerendered dark shell, SEO titles, JSON-LD SoftwareApplication + FAQPage, sitemap.xml, and robots.txt verified');
+  assert.ok(
+    jsonLdRaw &&
+      jsonLdRaw.includes('SoftwareApplication') &&
+      jsonLdRaw.includes('BreadcrumbList') &&
+      jsonLdRaw.includes('FAQPage'),
+  );
+  assert.match(await prerenderPage.locator('body').innerText(), /Related developer utilities/);
+
+  // Client SPA SEO lifecycle: 404 sets noindex & removes canonical; valid routes restore canonical + single JSON-LD
+  await page.goto(`${baseURL}/tools/nonexistent-seo-route`, { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { level: 1, name: 'Utility route not found' }).waitFor();
+  assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'noindex, nofollow');
+  assert.equal(await page.locator('link[rel="canonical"]').count(), 0);
+  assert.equal(await page.locator('script[type="application/ld+json"]').count(), 0);
+
+  await page.getByRole('link', { name: 'Return to Directory' }).click();
+  await page.waitForURL(`${baseURL}/`);
+  await page.getByRole('heading', { level: 1 }).waitFor();
+  assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'), 'index, follow');
+  assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');
+  assert.equal(await page.locator('script[type="application/ld+json"]').count(), 1);
+
+  await page.goto(`${baseURL}/?category=Security`, { waitUntil: 'networkidle' });
+  assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://microtools-hub-d6l.pages.dev/');
+  console.log('[ui] SSR prerendered dark shell, SEO titles, single JSON-LD, 404 noindex lifecycle, GSC verification, sitemap.xml, and robots.txt verified');
 
   // 2. Responsive overflow & screenshot sweep across 320px -> 2560px
   for (const width of viewports) {
