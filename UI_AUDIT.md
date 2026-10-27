@@ -1,5 +1,7 @@
 # UI Audit — MicroTools Hub
 
+> Historical audit and redesign log from 2026-10-20. Baseline descriptions below are not current-state findings. For the 2026-10-22 verification, reproduced defects, fixes, and validation limits, see `PROJECT_CONTEXT.md`. Prior-session command results below have no retained logs in this checkout and have not been independently certified as historical events.
+
 **Audit date:** 2026-10-20
 **Branch:** `arena/7b129867-microtools-hub`
 **Baseline commit:** `fa32095` (local shallow snapshot; Arena identifies this active branch)
@@ -29,7 +31,7 @@
 | `/slug-generator/` | Standalone HTML/JS | Accent-stripped slug creation, separator/number/length options, copy and clear. |
 | `/api/screenshot?url=...` | Cloudflare Pages GET Function | Bounded server-side HTTPS fetch for the URL inspector. |
 
-Cloudflare Pages serves prerendered React tool HTML under `/tools/<slug>/`; client-side routing hydrates the React UI when JavaScript loads. `public/_redirects` contains `/* /index.html 200`. A previous Wrangler local run reported this as an infinite-loop rule and ignored it; deployed fallback behavior needs a Pages test.
+Cloudflare Pages is intended to serve prerendered React tool HTML under `/tools/<slug>/`; `createRoot` replaces the static fallback with the React UI when JavaScript loads (it does not hydrate it). `public/_redirects` contains `/* /index.html 200`. A previous Wrangler local run reported this as an infinite-loop rule and ignored it; deployed fallback behavior needs a Pages test.
 
 ## Existing components and controls
 

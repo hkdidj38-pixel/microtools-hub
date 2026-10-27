@@ -5,12 +5,28 @@ export interface ToolFAQ {
   a: string;
 }
 
+export interface ToolStep {
+  title: string;
+  detail: string;
+}
+
+export type ToolCategory = 'Text' | 'Dev' | 'Encode' | 'Security' | 'Files';
+
 export interface ToolMeta {
   slug: string;
   name: string;
   description: string;
+  useCase?: string;
+  codePreview?: string;
+  popular?: boolean;
   category: string;
   keywords: string[];
+  privacy: {
+    mode: 'local' | 'edge';
+    label: string;
+    description: string;
+  };
+  steps?: ToolStep[];
   faqs: ToolFAQ[];
 }
 
@@ -37,4 +53,7 @@ export const TOOLS_REGISTRY: RegisteredTool[] = Object.entries(metaModules)
     };
   })
   .filter((item): item is RegisteredTool => item !== null)
-  .sort((a, b) => a.name.localeCompare(b.name));
+  .sort((a, b) => {
+    if (Boolean(a.popular) !== Boolean(b.popular)) return a.popular ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });

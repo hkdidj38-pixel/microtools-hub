@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Media Converter — Licenses and notices</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.6 system-ui, sans-serif; color: #1d2530; background: #f5f7f8; }
+    body { margin: 0 auto; max-width: 56rem; padding: 2rem 1.25rem 4rem; }
+    h1, h2 { line-height: 1.2; }
+    h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); }
+    h2 { margin-top: 2rem; font-size: 1.25rem; }
+    a { color: #135e54; overflow-wrap: anywhere; }
+    .notice { padding: 1rem; border: 1px solid #b8c6c2; border-radius: .75rem; background: white; }
+    li { margin-block: .4rem; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <main>
+    <p><a href="/tools/media-converter/">← Back to Media Converter</a></p>
+    <h1>Media Converter — licenses and notices</h1>
+    <p class="notice"><strong>Not legal advice or clearance.</strong> The FFmpeg core package declares GPL-2.0-or-later and was built with GPL enabled. Source correspondence, complete license obligations, notices, and codec patent questions have not been cleared by counsel. Do not treat this page as approval to distribute the core.</p>
+
+    <h2>FFmpeg core and source references</h2>
+    <ul>
+      <li>Bundled core: <code>@ffmpeg/core 0.12.10</code>; reports FFmpeg <code>5.1.4</code>, libavcodec <code>59.37.100</code>, and Emscripten <code>3.1.40</code>. The npm package declares <strong>GPL-2.0-or-later</strong>.</li>
+      <li><a href="/tools/media-converter/GPL-2.0.txt">GNU General Public License version 2 text</a> (copied from the FFmpeg n5.1.4 source tag).</li>
+      <li>FFmpeg source reference: <a href="https://github.com/FFmpeg/FFmpeg/tree/n5.1.4">FFmpeg n5.1.4</a>; its <a href="https://github.com/FFmpeg/FFmpeg/blob/n5.1.4/COPYING.GPLv2">GPL license file</a> is also available upstream.</li>
+      <li>WebAssembly wrapper source reference: <a href="https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v0.12.10">ffmpeg.wasm v0.12.10</a> and <a href="https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v0.12.10/build">its build scripts</a>.</li>
+    </ul>
+    <p><strong>Corresponding-source caveat:</strong> the published npm core archive contains generated JavaScript/WebAssembly and package metadata, not FFmpeg source or a license text. The public ffmpeg.wasm v0.12.10 tag's <code>packages/core/package.json</code> reports version 0.12.6 and MIT, unlike the published npm core's version/license metadata. The linked tags are upstream source references; they have not been matched to the exact bundled binary or build inputs. Obtain and verify the exact corresponding source and notices before distribution.</p>
+
+    <h2>Enabled libraries reported by the bundled core</h2>
+    <p>The core's <code>-buildconf</code> output enables the following projects. These source links are provided for identification and review; exact component revisions and license applicability to this binary have not been independently established. Consult each upstream project's license files and obtain counsel review.</p>
+    <ul>
+      <li><a href="https://code.videolan.org/videolan/x264">x264</a> — enabled as <code>libx264</code>.</li>
+      <li><a href="https://bitbucket.org/multicoreware/x265_git/src/">x265</a> — enabled as <code>libx265</code>.</li>
+      <li><a href="https://github.com/webmproject/libvpx">libvpx</a> — enabled as <code>libvpx</code>.</li>
+      <li><a href="https://sourceforge.net/p/lame/svn/HEAD/tree/">LAME</a> — enabled as <code>libmp3lame</code>.</li>
+      <li><a href="https://gitlab.xiph.org/xiph/theora">Theora</a> — enabled as <code>libtheora</code>.</li>
+      <li><a href="https://gitlab.xiph.org/xiph/vorbis">Vorbis</a> — enabled as <code>libvorbis</code>.</li>
+      <li><a href="https://github.com/xiph/opus">Opus</a> — enabled as <code>libopus</code>.</li>
+      <li><a href="https://github.com/madler/zlib">zlib</a> — enabled as <code>zlib</code>.</li>
+      <li><a href="https://chromium.googlesource.com/webm/libwebp/">libwebp</a> — enabled as <code>libwebp</code>.</li>
+      <li><a href="https://gitlab.freedesktop.org/freetype/freetype">FreeType</a> — enabled as <code>libfreetype</code>.</li>
+      <li><a href="https://github.com/fribidi/fribidi">FriBidi</a> — enabled as <code>libfribidi</code>.</li>
+      <li><a href="https://github.com/libass/libass">libass</a> — enabled as <code>libass</code>.</li>
+      <li><a href="https://github.com/sekrit-twc/zimg">zimg</a> — enabled as <code>libzimg</code>.</li>
+    </ul>
+
+    <h2>Wrapper and application</h2>
+    <ul>
+      <li><code>@ffmpeg/ffmpeg 0.12.15</code> declares MIT; see its <a href="https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v0.12.15">upstream tag</a>.</li>
+      <li>The MicroTools Hub application source is in the repository. The presence of this notice does not resolve the FFmpeg core's source-correspondence or distribution obligations.</li>
+    </ul>
+  </main>
+</body>
+</html>

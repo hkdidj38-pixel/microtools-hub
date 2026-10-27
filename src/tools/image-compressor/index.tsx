@@ -6,7 +6,6 @@ import {
   FileImage,
   LoaderCircle,
   RefreshCw,
-  ShieldCheck,
   Trash2,
   UploadCloud,
 } from 'lucide-react';
@@ -87,9 +86,11 @@ export default function ImageCompressorTool() {
   const [maxDimension, setMaxDimension] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
   const runIdRef = useRef(0);
   const zipRunIdRef = useRef(0);
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -279,8 +280,16 @@ export default function ImageCompressorTool() {
     : 0;
 
   return (
-    <div className="tool-workspace space-y-6">
-      <div className="grid gap-5 rounded-xl border border-line bg-paper p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
+    <div className="tool-workspace space-y-5 sm:space-y-6">
+      <section className="rounded-2xl border border-line bg-paper/55 p-4 sm:p-5" aria-labelledby="image-settings-heading">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">01 · Configure</p>
+            <h2 id="image-settings-heading" className="mt-1 text-sm font-extrabold text-ink">Compression settings</h2>
+          </div>
+          <p className="text-xs text-muted">Changes apply to the next compression run.</p>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label htmlFor="quality" className="mb-2 block text-xs font-semibold text-ink">
             Compression quality <span className="ml-1 text-brand">{quality}%</span>
@@ -304,7 +313,7 @@ export default function ImageCompressorTool() {
             id="max-dimension"
             value={maxDimension}
             onChange={(event) => setMaxDimension(Number(event.target.value))}
-            className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
+            className="hub-input py-2"
           >
             <option value={0}>Original dimensions</option>
             <option value={1920}>Max 1920px (Full HD)</option>
@@ -318,26 +327,46 @@ export default function ImageCompressorTool() {
             type="button"
             disabled={rawFiles.length === 0 || isProcessing}
             onClick={() => void runBatchCompression(rawFiles, { quality: quality / 100, maxDimension })}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-line"
+            className="hub-button-accent w-full px-4 py-2.5 text-sm"
           >
             {isProcessing ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
             {isProcessing ? 'Compressing…' : 'Apply & re-compress'}
           </button>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
-        }}
-      >
+      <section aria-labelledby="image-files-heading" className="space-y-3">
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">02 · Add files</p>
+          <h2 id="image-files-heading" className="mt-1 text-sm font-extrabold text-ink">Choose images to compress</h2>
+        </div>
+        <div
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (isProcessing) return;
+            dragDepthRef.current += 1;
+            setIsDragActive(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+            if (dragDepthRef.current === 0) setIsDragActive(false);
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            dragDepthRef.current = 0;
+            setIsDragActive(false);
+            if (!isProcessing) handleFilesSelected(event.dataTransfer.files);
+          }}
+        >
         <button
           type="button"
+          data-dragging={isDragActive}
           disabled={isProcessing || rawFiles.length >= MAX_FILES}
           onClick={() => fileInputRef.current?.click()}
-          className="block w-full rounded-2xl border-2 border-dashed border-brand/30 bg-brand-soft/50 p-5 text-center transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 sm:p-10"
+          className={`hub-dropzone block w-full rounded-2xl border-2 border-dashed p-5 text-center transition-[border-color,background-color,box-shadow] duration-standard ease-standard disabled:cursor-not-allowed disabled:opacity-60 sm:p-10 ${isDragActive ? 'border-brand bg-brand-soft ring-2 ring-brand/20 shadow-soft' : 'border-brand/30 bg-brand-soft/50 hover:border-brand hover:bg-brand-soft'}`}
         >
           <UploadCloud className="mx-auto mb-3 h-11 w-11 text-brand" aria-hidden="true" />
           <span className="block font-bold text-ink">Drop images here or click to browse</span>
@@ -357,31 +386,27 @@ export default function ImageCompressorTool() {
             event.target.value = '';
           }}
         />
-      </div>
+        </div>
+      </section>
 
-      <div className="flex items-start gap-2 rounded-lg bg-paper px-3.5 py-3 text-xs leading-relaxed text-muted">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
-        <p><strong className="text-ink">Private by design.</strong> Image data is processed on your device; nothing is uploaded. Large images may take a moment to process.</p>
-      </div>
-
-      {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{notice}</p>}
-      {errorMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMsg}</p>}
+      {notice && <p className="hub-notification--notice rounded-[8px] border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 motion-safe:animate-hub-enter" role="status">{notice}</p>}
+      {errorMsg && <p className="hub-notification--error rounded-[8px] border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 motion-safe:animate-hub-enter" role="alert">{errorMsg}</p>}
 
       {isProcessing && (
-        <div className="flex items-center gap-3 rounded-xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
-          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+        <div className="flex items-center gap-3 rounded-[10px] border border-brand/25 bg-brand-soft px-4 py-3 text-sm text-ink" role="status" aria-live="polite">
+          <LoaderCircle className="h-4 w-4 animate-spin text-brand" aria-hidden="true" />
           Compressing {rawFiles.length} {rawFiles.length === 1 ? 'image' : 'images'}… Keep this tab open until processing is complete.
         </div>
       )}
 
       {items.length > 0 && (
-        <section className="space-y-4" aria-label="Compressed images">
-          <div className="flex flex-col justify-between gap-4 rounded-xl border border-brand/20 bg-brand-soft px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+        <section className="hub-results-panel--images space-y-4 motion-safe:animate-hub-enter" aria-label="Compressed images">
+          <div className="flex flex-col justify-between gap-4 rounded-[10px] border border-brand/25 bg-surface px-4 py-4 sm:flex-row sm:items-center sm:px-5">
             <div className="flex items-center gap-2.5">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden="true" />
               <div className="text-sm">
                 <p className="font-bold text-ink">{totalSavedPercent > 0 ? `Saved ${formatBytes(totalOriginal - totalCompressed)} (${totalSavedPercent}%)` : 'Your images are ready'}</p>
-                <p className="mt-0.5 text-xs text-muted">{formatBytes(totalOriginal)} total <span aria-hidden="true">→</span> {formatBytes(totalCompressed)} · {items.length} {items.length === 1 ? 'image' : 'images'}</p>
+                <p className="mt-0.5 font-mono text-xs text-muted">{formatBytes(totalOriginal)} total <span aria-hidden="true">→</span> {formatBytes(totalCompressed)} · {items.length} {items.length === 1 ? 'image' : 'images'}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -389,7 +414,7 @@ export default function ImageCompressorTool() {
                 type="button"
                 onClick={() => void handleDownloadZip()}
                 disabled={isZipping}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60 sm:flex-none"
+                className="hub-button-accent flex-1 px-4 py-2 text-xs sm:flex-none"
               >
                 {isZipping ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Archive className="h-4 w-4" aria-hidden="true" />}
                 {isZipping ? 'Preparing ZIP…' : 'Download All (.ZIP)'}
@@ -397,31 +422,31 @@ export default function ImageCompressorTool() {
               <button
                 type="button"
                 onClick={handleClearAll}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2.5 text-xs font-semibold text-ink transition hover:bg-paper"
+                className="hub-button-secondary px-3 py-2 text-xs"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" /> Clear all
               </button>
             </div>
           </div>
 
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
-            {items.map((item) => (
-              <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4">
+          <div className="divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
+            {items.map((item, index) => (
+              <article key={item.id} className="flex min-w-0 items-center justify-between gap-3 p-3 sm:gap-4 sm:p-4 motion-safe:animate-hub-card-enter" style={{ animationDelay: `${Math.min(index * 45, 135)}ms` }}>
                 <div className="flex min-w-0 items-center gap-3">
                   <ImageThumbnail blob={item.compressedBlob} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink" title={item.originalFile.name}>{item.originalFile.name}</p>
-                    <p className="mt-0.5 text-xs text-muted">{formatBytes(item.originalSize)} <span aria-hidden="true">→</span> <span className="font-semibold text-ink">{formatBytes(item.compressedSize)}</span></p>
+                    <p className="mt-0.5 font-mono text-xs text-muted">{formatBytes(item.originalSize)} <span aria-hidden="true">→</span> <span className="font-semibold text-ink">{formatBytes(item.compressedSize)}</span></p>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.savedPercent > 0 ? 'bg-brand-soft text-brand-dark' : 'bg-paper text-muted'}`}>
+                  <span className={`rounded-[6px] border px-2 py-0.5 font-mono text-xs font-semibold ${item.savedPercent > 0 ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300' : 'border-line bg-paper text-muted'}`}>
                     {item.savedPercent > 0 ? `-${item.savedPercent}%` : 'Original'}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleImageDownload(item)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-2 text-xs font-semibold text-brand hover:bg-brand-soft sm:px-3"
+                    className="hub-button-primary min-h-8 px-2.5 py-1.5 text-xs sm:px-3"
                     aria-label={`Download ${item.originalFile.name}`}
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" /> <span className="hidden sm:inline">Save</span>

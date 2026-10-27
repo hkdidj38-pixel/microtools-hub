@@ -1,90 +1,237 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ArrowUpRight, HelpCircle, ShieldCheck, Sparkles } from 'lucide-react';
+import { ChevronRight, Star } from 'lucide-react';
 import type { ToolMeta } from '@/lib/registry';
+import { SITE_ORIGIN } from '@/lib/siteConfig';
+import { useLocalActivityPulse } from '@/lib/storage';
+
+export function buildToolDocumentTitle(tool: ToolMeta): string {
+  if (tool.privacy.mode === 'edge') {
+    return `${tool.name} - Fail-Closed Edge Metadata | MicroTools Hub`;
+  }
+  return `${tool.name} - Private, Offline & Free | MicroTools Hub`;
+}
 
 interface ToolLayoutProps {
-  meta: ToolMeta;
+  tool: ToolMeta;
+  isFavorite: boolean;
+  onToggleFavorite: (slug: string) => void;
   children: React.ReactNode;
 }
 
-export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
-  const isEdgeTool = meta.slug === 'url-screenshot';
+export function ToolLayout({
+  tool,
+  isFavorite,
+  onToggleFavorite,
+  children,
+}: ToolLayoutProps) {
+  const isPulsing = useLocalActivityPulse();
+  const isEdge = tool.privacy.mode === 'edge';
 
   useEffect(() => {
-    document.title = `${meta.name} — MicroTools Hub`;
-    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    description?.setAttribute('content', meta.description);
-    window.scrollTo(0, 0);
-  }, [meta]);
+    document.title = buildToolDocumentTitle(tool);
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', tool.description);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.setAttribute('href', `${SITE_ORIGIN}/tools/${tool.slug}`);
+  }, [tool]);
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: tool.name,
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Any (Web Browser)',
+        url: `${SITE_ORIGIN}/tools/${tool.slug}`,
+        description: tool.description,
+        isAccessibleForFree: true,
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: tool.faqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.q,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.a,
+          },
+        })),
+      },
+    ],
+  };
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      <header className="sticky top-0 z-30 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
-        <div className="hub-container flex h-16 items-center justify-between gap-2 sm:h-[4.5rem] sm:gap-4">
-          <Link className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-xl sm:gap-3" to="/" aria-label="Back to MicroTools Hub">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6 sm:h-10 sm:w-10 sm:rounded-2xl">
-              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
-          </Link>
-          <div className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-bold sm:gap-2 sm:px-3.5 sm:py-2 sm:text-xs ${isEdgeTool ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-brand/15 bg-brand-soft text-brand-dark'}`}>
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
-            <span className="whitespace-nowrap">{isEdgeTool ? 'Disclosed edge fetch' : 'Runs in your browser'}</span>
-          </div>
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      <div className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-7 sm:px-6 sm:py-9">
+        {/* Breadcrumb + Favorite Star */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap items-center gap-1.5 font-mono text-xs text-muted">
+            <Link to="/" className="hover:text-ink">
+              microtools
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+            <Link to={`/?category=${encodeURIComponent(tool.category)}`} className="lowercase hover:text-ink">
+              {tool.category}
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+            <span className="text-ink">{tool.slug}</span>
+          </nav>
+
+          <button
+            type="button"
+            onClick={() => onToggleFavorite(tool.slug)}
+            aria-pressed={isFavorite}
+            className={`inline-flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1 font-mono text-xs transition-colors ${
+              isFavorite
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                : 'border-line bg-surface text-muted hover:bg-surface-hover hover:text-ink'
+            }`}
+          >
+            <Star
+              className={`h-3.5 w-3.5 ${isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
+              aria-hidden="true"
+            />
+            <span>{isFavorite ? 'Starred' : 'Star tool'}</span>
+          </button>
         </div>
-      </header>
 
-      <main className="hub-container min-w-0 w-full flex-1 py-6 sm:py-12">
-        <Link className="group mb-5 inline-flex items-center gap-2 rounded-xl text-sm font-semibold text-muted transition hover:text-brand sm:mb-7" to="/">
-          <span className="grid h-8 w-8 place-items-center rounded-xl border border-line bg-white transition group-hover:border-brand/25 group-hover:bg-brand-soft"><ArrowLeft className="h-4 w-4" aria-hidden="true" /></span>
-          All tools
-        </Link>
-
-        <div className="mx-auto min-w-0 max-w-5xl">
-          <div className="mb-5 flex min-w-0 flex-col justify-between gap-4 sm:mb-7 sm:flex-row sm:items-end sm:gap-5">
-            <div className="min-w-0 max-w-3xl">
-              <p className="hub-eyebrow">{meta.category} toolkit</p>
-              <h1 className="mt-3 break-words text-[clamp(1.65rem,7.5vw,3rem)] font-black leading-tight tracking-[-0.04em] text-ink sm:text-4xl lg:text-5xl">{meta.name}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted sm:text-base sm:leading-7">{meta.description}</p>
-            </div>
-            <Link to="/" className="hidden shrink-0 items-center gap-2 text-xs font-extrabold text-brand transition hover:gap-3 sm:inline-flex">Browse the shelf <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+        {/* Unique H1 + concise technical summary */}
+        <header className="mt-4 border-b border-line pb-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-[5px] border border-line bg-surface px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-muted">
+              {tool.category}
+            </span>
+            <span
+              className={`rounded-[5px] border px-2 py-0.5 font-mono text-[11px] ${
+                isEdge
+                  ? 'border-amber-500/35 bg-amber-500/10 text-amber-200'
+                  : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+              }`}
+            >
+              {tool.privacy.label}
+            </span>
           </div>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+            {tool.name}
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted sm:text-base">
+            {tool.description}
+          </p>
+        </header>
 
-          <section className="min-w-0 rounded-3xl border border-line bg-white p-3 shadow-soft sm:rounded-[2rem] sm:p-6 lg:p-8" aria-label={`${meta.name} workspace`}>
-            {children}
+        {/* Main Tool Workbench */}
+        <section className="mt-6 min-w-0" aria-label={`${tool.name} workbench`}>
+          {children}
+        </section>
+
+        {/* Below Workbench: 3-step How It Works + SEO FAQ */}
+        <div className="mt-12 grid min-w-0 gap-8 border-t border-line pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+          {/* 3-Step How It Works */}
+          <section className="min-w-0" aria-labelledby="how-it-works-heading">
+            <p className="font-mono text-xs uppercase tracking-wider text-brand">
+              PIPELINE
+            </p>
+            <h2 id="how-it-works-heading" className="mt-1 text-lg font-semibold text-ink">
+              How it works
+            </h2>
+            <ol className="mt-4 space-y-3">
+              {(tool.steps ?? []).map((step, index) => (
+                <li
+                  key={step.title}
+                  className="rounded-[10px] border border-line bg-surface p-4"
+                >
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="font-mono text-xs font-semibold text-brand">
+                      0{index + 1}
+                    </span>
+                    <h3 className="text-sm font-semibold text-ink">{step.title}</h3>
+                  </div>
+                  <p className="mt-1.5 pl-6 text-xs leading-relaxed text-muted">
+                    {step.detail}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </section>
 
-          {meta.faqs.length > 0 && (
-            <section className="mt-8 sm:mt-12" aria-labelledby="faq-heading">
-              <div className="mb-4 flex min-w-0 items-end justify-between gap-4 sm:mb-5">
-                <div className="min-w-0">
-                  <p className="hub-eyebrow">Good to know</p>
-                  <h2 id="faq-heading" className="mt-2 flex items-start gap-2 text-xl font-black tracking-tight text-ink sm:text-2xl">
-                    <HelpCircle className="h-5 w-5 text-brand" aria-hidden="true" /> Frequently asked questions
-                  </h2>
-                </div>
-                <ArrowUpRight className="mb-1 hidden h-5 w-5 text-brand/50 sm:block" aria-hidden="true" />
+          {/* Technical FAQ */}
+          <section className="min-w-0" aria-labelledby="tool-faq-heading">
+            <p className="font-mono text-xs uppercase tracking-wider text-brand">
+              SPECIFICATION &amp; PRIVACY
+            </p>
+            <h2 id="tool-faq-heading" className="mt-1 text-lg font-semibold text-ink">
+              Frequently asked questions
+            </h2>
+            <div className="mt-4 divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
+              {tool.faqs.map((faq) => (
+                <details key={faq.q} className="group p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+                    <span>{faq.q}</span>
+                    <span className="font-mono text-xs text-muted transition-transform group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-2.5 text-xs leading-relaxed text-muted sm:text-sm">
+                    {faq.a}
+                  </p>
+                </details>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {/* Task 7: Sticky Local Proof / Disclosed Edge Telemetry Bar */}
+      <div
+        className="sticky bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-md"
+        role="region"
+        aria-label="Execution privacy proof"
+      >
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2.5 font-mono text-xs sm:px-6">
+          {isEdge ? (
+            <>
+              <div className="flex items-center gap-2 text-amber-200">
+                <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
+                <span className="font-semibold">Disclosed Edge</span>
+                <span className="text-muted">·</span>
+                <span className="text-muted">
+                  Target URL is sent to this site’s fail-closed Cloudflare Function
+                </span>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {meta.faqs.map((faq) => (
-                  <article key={faq.q} className="min-w-0 rounded-2xl border border-line bg-white p-4 transition hover:border-brand/20 hover:shadow-sm sm:p-5">
-                    <h3 className="font-bold leading-6 text-ink">{faq.q}</h3>
-                    <p className="mt-2 text-sm leading-6 text-muted">{faq.a}</p>
-                  </article>
-                ))}
+              <span className="text-muted">Cookies &amp; auth headers are never forwarded</span>
+            </>
+          ) : (
+            <>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[6px] border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+                  <span
+                    className="hub-local-dot shrink-0"
+                    data-pulsing={isPulsing ? 'true' : 'false'}
+                    aria-hidden="true"
+                  />
+                  <span>{isPulsing ? 'Local · Executing' : 'Local'}</span>
+                </span>
+                <span className="min-w-0 text-muted">
+                  Runs offline - open DevTools Network tab
+                </span>
               </div>
-            </section>
+              <span className="text-ink">No data leaves your device</span>
+            </>
           )}
         </div>
-      </main>
-
-      <footer className="mt-4 border-t border-line bg-white">
-        <div className="hub-container flex flex-col gap-3 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-bold text-ink">MicroTools Hub <span className="font-normal text-muted">· Thoughtful little tools for everyday work.</span></p>
-          <Link to="/" className="inline-flex items-center gap-1 font-bold text-brand hover:underline">Back to all tools <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
-        </div>
-      </footer>
+      </div>
     </div>
   );
-};
+}

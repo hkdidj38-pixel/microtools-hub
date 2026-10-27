@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Activity, ArrowUpRight, Clock3, Globe2, LoaderCircle, ShieldAlert } from 'lucide-react';
+import { Activity, ArrowUpRight, Clock3, Globe2, LoaderCircle } from 'lucide-react';
 import { fetchEdgeTelemetry, type TelemetryResponse } from './logic';
 
 function formatTimestamp(timestamp: number): string {
@@ -62,12 +62,17 @@ export default function UrlScreenshotTool() {
   };
 
   return (
-    <div className="tool-workspace space-y-6">
-      <form onSubmit={inspect} className="space-y-3">
-        <label htmlFor="target-url" className="block text-sm font-semibold text-ink">Public website URL</label>
-        <div className="flex flex-col gap-2 sm:flex-row">
+    <div className="tool-workspace space-y-5 sm:space-y-6">
+      <form onSubmit={inspect} className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
+        <div className="mb-4 flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[8px] border border-line bg-paper text-brand"><Globe2 className="h-5 w-5" aria-hidden="true" /></span>
+          <div>
+            <label htmlFor="target-url" className="block text-sm font-bold text-ink">HTTPS page address</label>
+            <p className="mt-1 text-xs leading-5 text-muted">Metadata and edge telemetry only — this tool does not capture screenshots.</p>
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
           <div className="relative min-w-0 flex-1">
-            <Globe2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
               id="target-url"
               type="url"
@@ -77,94 +82,99 @@ export default function UrlScreenshotTool() {
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://example.com"
-              className="hub-input min-h-12 pl-10 pr-3"
+              className="hub-input min-h-12 pr-3 font-mono"
             />
           </div>
           <button
             type="submit"
             disabled={isLoading || !url.trim()}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-line"
+            className="hub-button-accent min-h-12 w-full shrink-0 sm:w-auto sm:min-w-44"
           >
             {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Activity className="h-4 w-4" aria-hidden="true" />}
-            {isLoading ? 'Inspecting…' : 'Inspect website'}
+            {isLoading ? 'Inspecting…' : 'Inspect metadata'}
           </button>
         </div>
-        <p className="text-xs leading-relaxed text-muted">HTTPS only. Local/private hosts and unsafe redirects are blocked.</p>
+        <p className="mt-2 text-xs leading-5 text-muted">Only exact operator-approved HTTPS hosts are accepted. Inspection remains unavailable until secure egress is configured.</p>
       </form>
 
-      <div className="flex items-start gap-2.5 rounded-2xl border border-brand/15 bg-brand-soft px-4 py-3 text-xs leading-relaxed text-brand-dark">
-        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <p><strong>Edge fetch disclosure:</strong> The URL you submit is sent to this site’s Cloudflare Function, which fetches a small HTML prefix to read metadata. Your browser cookies and authorization headers are not forwarded. Avoid private URLs and URLs containing secrets.</p>
-      </div>
+      {error && <p className="rounded-[8px] border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">{error}</p>}
 
-      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
-
-      <section aria-label="Edge telemetry terminal" className="overflow-hidden rounded-2xl border border-white/10 bg-[#111a15] shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-white/10 bg-white/[0.04] px-3 py-3 sm:px-4">
-          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span className="ml-2 font-mono text-xs font-semibold tracking-wide text-white/75">EDGE INSPECTOR</span>
+      <section aria-labelledby="inspection-report-heading" aria-live="polite" className="min-w-0 overflow-hidden rounded-[10px] border border-line bg-surface">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper px-4 py-3.5 sm:px-5">
+          <div>
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-brand">Inspection report</p>
+            <h2 id="inspection-report-heading" className="mt-1 text-sm font-bold text-ink">Page metadata &amp; edge details</h2>
           </div>
-          <span className="max-w-full break-words text-right font-mono text-[9px] uppercase tracking-[0.1em] text-white/40 sm:text-[10px] sm:tracking-widest">Cloudflare Pages Function</span>
-        </div>
+          {result && (
+            <span className={`inline-flex min-h-7 items-center rounded-[6px] border px-2.5 py-0.5 font-mono text-xs font-semibold ${result.upstreamStatus < 400 ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/35 bg-amber-500/10 text-amber-200'}`}>
+              HTTP {result.upstreamStatus} {result.upstreamStatusText}
+            </span>
+          )}
+        </header>
 
-        <div className="space-y-4 p-4 font-mono text-xs sm:p-5" aria-live="polite">
-          {!result && !isLoading && !error && (
-            <div className="space-y-2 text-white/60">
-              <p><span className="text-emerald-400">$</span> edge-inspector --awaiting-target</p>
-              <p className="text-white/40">Enter a public HTTPS URL to inspect page metadata, response headers, and edge telemetry.</p>
+        <div className="space-y-5 p-4 sm:p-5">
+          {!result && !isLoading && (
+            <div className="rounded-xl border border-dashed border-line bg-paper/45 px-4 py-6 text-center">
+              <p className="text-sm font-bold text-ink">Your report will appear here.</p>
+              <p className="mt-1 text-xs leading-5 text-muted">It can include a page title, meta description, selected response headers, and Cloudflare edge telemetry.</p>
             </div>
           )}
           {isLoading && (
-            <p className="flex items-center gap-2 text-emerald-300"><LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Connecting to the edge function…</p>
+            <p className="flex min-h-20 items-center justify-center gap-2 text-sm font-semibold text-brand" role="status">
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Contacting the site’s edge inspection path…
+            </p>
           )}
-          {error && !result && <p className="text-rose-300"><span className="text-rose-400">[error]</span> {error}</p>}
 
           {result && (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="break-all text-emerald-300"><span className="text-white/40">target:</span> {result.target}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${result.upstreamStatus < 400 ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'}`}>
-                  HTTP {result.upstreamStatus} {result.upstreamStatusText}
-                </span>
-              </div>
-
-              <div className="grid gap-3 rounded-xl border border-white/10 bg-white/[0.04]/70 p-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-white/40">Page title</p>
-                  <p className="mt-1 break-words text-slate-100">{result.title || 'Not found in the returned HTML'}</p>
+              <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <div className="min-w-0 rounded-xl bg-paper/65 p-3.5 sm:col-span-2">
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Requested page</dt>
+                  <dd className="mt-1 break-all text-sm font-semibold text-ink">{result.target}</dd>
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-white/40">Meta description</p>
-                  <p className="mt-1 break-words leading-relaxed text-white/75">{result.description || 'Not found in the returned HTML'}</p>
+                <div className="min-w-0 rounded-xl border border-line p-3.5">
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Page title</dt>
+                  <dd className="mt-1 break-words text-sm text-ink">{result.title || 'Not found in the returned HTML'}</dd>
                 </div>
-              </div>
+                <div className="min-w-0 rounded-xl border border-line p-3.5">
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Meta description</dt>
+                  <dd className="mt-1 break-words text-sm leading-5 text-muted">{result.description || 'Not found in the returned HTML'}</dd>
+                </div>
+              </dl>
 
-              <div className="grid gap-2 border-y border-white/10 py-3 sm:grid-cols-2">
-                <p className="text-white/75"><span className="text-white/40">edge colo:</span> <strong className="text-cyan-300">{result.edgeColo}</strong></p>
-                <p className="text-white/75"><span className="text-white/40">country:</span> <strong className="text-cyan-300">{result.country}</strong></p>
-                <p className="flex items-center gap-1.5 text-white/60"><Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> {formatTimestamp(result.timestamp)}</p>
-                <p className="break-all text-white/60 sm:col-span-2"><span className="text-white/40">caller user-agent:</span> {result.userAgent}</p>
-                <p className="text-white/60">content-type: {result.contentType || 'unknown'}</p>
-              </div>
+              <section aria-labelledby="edge-details-heading">
+                <div className="mb-2 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-brand" aria-hidden="true" />
+                  <h3 id="edge-details-heading" className="text-xs font-extrabold uppercase tracking-[0.12em] text-ink">Edge telemetry &amp; response</h3>
+                </div>
+                <dl className="grid min-w-0 gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl bg-paper/65 p-3"><dt className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">Edge colo</dt><dd className="mt-1 break-words text-sm font-semibold text-ink">{result.edgeColo}</dd></div>
+                  <div className="rounded-xl bg-paper/65 p-3"><dt className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">Country</dt><dd className="mt-1 break-words text-sm font-semibold text-ink">{result.country}</dd></div>
+                  <div className="min-w-0 rounded-xl bg-paper/65 p-3"><dt className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">Content type</dt><dd className="mt-1 break-all text-xs text-ink">{result.contentType || 'Unknown'}</dd></div>
+                  <div className="min-w-0 rounded-xl bg-paper/65 p-3"><dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><Clock3 className="h-3 w-3" aria-hidden="true" /> Inspected at</dt><dd className="mt-1 break-words text-xs text-ink">{formatTimestamp(result.timestamp)}</dd></div>
+                  <div className="min-w-0 rounded-xl bg-paper/65 p-3 sm:col-span-2"><dt className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">Inspector user-agent</dt><dd className="mt-1 break-all text-xs text-ink">{result.userAgent}</dd></div>
+                  <div className="min-w-0 rounded-xl bg-paper/65 p-3 sm:col-span-2"><dt className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">Final URL</dt><dd className="mt-1 break-all text-xs text-ink">{result.finalUrl} <ArrowUpRight className="inline h-3 w-3" aria-hidden="true" /></dd></div>
+                </dl>
+              </section>
 
-              <div>
-                <p className="mb-2 text-[10px] uppercase tracking-wider text-white/40">Response headers</p>
+              <section aria-labelledby="response-headers-heading">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <h3 id="response-headers-heading" className="text-xs font-extrabold uppercase tracking-[0.12em] text-ink">Selected response headers</h3>
+                  <span className="text-[10px] text-muted">Allowlisted fields only</span>
+                </div>
                 {Object.keys(result.responseHeaders).length > 0 ? (
-                  <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                  <dl className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                     {Object.entries(result.responseHeaders).map(([name, value]) => (
-                      <div key={name} className="min-w-0 break-all"><dt className="inline text-white/40">{name}: </dt><dd className="inline text-white/75">{value}</dd></div>
+                      <div key={name} className="grid min-w-0 gap-1 px-3 py-2.5 sm:grid-cols-[minmax(10rem,.7fr)_minmax(0,1.3fr)] sm:gap-3">
+                        <dt className="break-words text-xs font-semibold text-muted">{name}</dt>
+                        <dd className="break-all text-xs text-ink">{value}</dd>
+                      </div>
                     ))}
                   </dl>
-                ) : <p className="text-white/40">No inspectable headers returned.</p>}
-              </div>
+                ) : <p className="rounded-xl bg-paper/65 px-3 py-3 text-xs text-muted">No inspectable headers returned.</p>}
+              </section>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3 text-[10px] text-white/40">
-                <p className="break-all">final URL: {result.finalUrl} <ArrowUpRight className="inline h-3 w-3" aria-hidden="true" /></p>
-                <p>{result.bodyTruncated ? 'HTML scan capped at 512 KiB' : /^(text\/html|application\/xhtml\+xml)/i.test(result.contentType) ? 'HTML scan complete' : 'HTML scan skipped (non-HTML response)'}</p>
-              </div>
+              <p className="text-xs leading-5 text-muted">{result.bodyTruncated ? 'HTML scan capped at 512 KiB.' : /^(text\/html|application\/xhtml\+xml)/i.test(result.contentType) ? 'HTML scan complete.' : 'HTML scan skipped because the response was not HTML.'}</p>
             </>
           )}
         </div>

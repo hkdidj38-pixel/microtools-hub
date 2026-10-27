@@ -48,11 +48,14 @@
         status.className = isError ? 'error' : 'success';
     }
 
-    function run() {
+    function run(reportEmpty = false) {
         const text = input.value;
         if (text.trim() === '') {
             output.value = '';
-            showStatus('Enter some text to generate a slug.', true);
+            status.textContent = '';
+            if (reportEmpty) {
+                showStatus('Enter some text to generate a slug.', true);
+            }
             return;
         }
         const sep = separator.value === '_' ? '_' : '-';
@@ -61,7 +64,7 @@
         showStatus('Slug generated locally.', false);
     }
 
-    generateBtn.addEventListener('click', run);
+    generateBtn.addEventListener('click', function () { run(true); });
     input.addEventListener('input', run);
     separator.addEventListener('change', run);
     maxLength.addEventListener('input', run);

@@ -5,9 +5,17 @@ interface EdgeProperties {
 
 interface PagesContext {
   request: Request & { cf?: EdgeProperties };
+  env?: {
+    URL_INSPECTOR_ALLOWED_HOSTS?: string;
+    // A trusted service binding, never an arbitrary proxy URL. See SECURITY.md.
+    URL_INSPECTOR_EGRESS?: { fetch(input: string, init: RequestInit): Promise<Response> };
+  };
 }
 
 class InvalidTargetError extends Error {}
+
+let activeRequests = 0;
+const MAX_CONCURRENT_REQUESTS = 4; // Per isolate only; shared quotas belong in the egress service.
 
 const MAX_URL_LENGTH = 2048;
 const MAX_HTML_BYTES = 512 * 1024;
@@ -72,8 +80,28 @@ function validateTarget(rawUrl: string): URL {
     throw new InvalidTargetError('Local, private, and IP-literal hosts are not allowed. Use a public hostname.');
   }
 
+  target.hostname = hostname;
   target.hash = '';
   return target;
+}
+
+function allowedHosts(value: string | undefined): Set<string> {
+  if (!value || value.length > 8192) throw new Error('Missing target policy');
+  const entries = value.split(',').map((entry) => entry.trim());
+  if (entries.length > 100) throw new Error('Too many hosts');
+  return new Set(entries.map((entry) => {
+    // Exact DNS names only; no URL syntax, wildcards, subdomain expansion or IDN ambiguity.
+    if (!/^[a-zA-Z0-9.-]+$/.test(entry) || entry.length > 253
+        || entry.split('.').some((label) => !/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(label))) {
+      throw new Error('Invalid target policy');
+    }
+    return validateTarget(`https://${entry}`).hostname;
+  }));
+}
+
+function cancelBody(response: Response): void {
+  // A peer's stalled cancellation must not extend the handler deadline.
+  void response.body?.cancel().catch(() => undefined);
 }
 
 function safeDisplayUrl(url: URL): string {
@@ -81,17 +109,22 @@ function safeDisplayUrl(url: URL): string {
   return `${url.origin}${url.pathname}`;
 }
 
-async function readHtmlPrefix(response: Response): Promise<{ html: string; truncated: boolean }> {
+async function readHtmlPrefix(response: Response, withinDeadline: <T>(work: Promise<T>) => Promise<T>): Promise<{ html: string; truncated: boolean }> {
   if (!response.body) return { html: '', truncated: false };
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const chunks: string[] = [];
   let bytesRead = 0;
   let truncated = false;
+  let reads = 0;
 
   try {
     while (bytesRead < MAX_HTML_BYTES) {
-      const { done, value } = await reader.read();
+      if (++reads > 2048) {
+        truncated = true;
+        break;
+      }
+      const { done, value } = await withinDeadline(reader.read());
       if (done) break;
       if (!value) continue;
       const remaining = MAX_HTML_BYTES - bytesRead;
@@ -100,11 +133,12 @@ async function readHtmlPrefix(response: Response): Promise<{ html: string; trunc
       chunks.push(decoder.decode(slice, { stream: true }));
       if (slice.byteLength < value.byteLength || bytesRead >= MAX_HTML_BYTES) {
         truncated = true;
-        await reader.cancel();
+        void reader.cancel().catch(() => undefined);
         break;
       }
     }
   } finally {
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 
@@ -133,12 +167,12 @@ function decodeHtmlEntities(value: string): string {
 }
 
 function cleanText(value: string, maxLength: number): string {
-  return decodeHtmlEntities(value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, maxLength);
+  return decodeHtmlEntities(value.slice(0, 8192).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, maxLength);
 }
 
 function readAttributes(tag: string): Record<string, string> {
   const attributes: Record<string, string> = {};
-  const matcher = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
+  const matcher = /(?:^|[\s<])([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
   let match: RegExpExecArray | null;
   while ((match = matcher.exec(tag)) !== null) {
     attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? '';
@@ -147,19 +181,35 @@ function readAttributes(tag: string): Record<string, string> {
 }
 
 function extractPageMetadata(html: string): { title: string | null; description: string | null } {
-  const titleMatch = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(html);
-  const title = titleMatch ? cleanText(titleMatch[1], 300) : '';
+  let title = '';
   let description = '';
-
-  for (const match of html.matchAll(/<meta\b[^>]*>/gi)) {
-    const attributes = readAttributes(match[0]);
-    const name = (attributes.name || attributes.property || '').toLowerCase();
-    if (name === 'description' || name === 'og:description') {
-      description = cleanText(attributes.content || '', 500);
-      if (description) break;
+  let cursor = 0;
+  let tags = 0;
+  let titleSeen = false;
+  // Scan each tag once. Repeated malformed open tags must not trigger quadratic regex scans.
+  while (cursor < html.length && tags < 2048) {
+    const start = html.indexOf('<', cursor);
+    if (start === -1) break;
+    const end = html.indexOf('>', start + 1);
+    if (end === -1) break;
+    cursor = end + 1;
+    tags += 1;
+    if (end - start > 8192) continue;
+    const tag = html.slice(start, cursor);
+    if (!titleSeen && /^<title\b/i.test(tag)) {
+      titleSeen = true;
+      const closing = /<\/title\s*>/i.exec(html.slice(cursor));
+      if (closing) title = cleanText(html.slice(cursor, cursor + closing.index), 300);
     }
+    if (!description && /^<meta\b/i.test(tag)) {
+      const attributes = readAttributes(tag);
+      const name = (attributes.name || attributes.property || '').toLowerCase();
+      if (name === 'description' || name === 'og:description') {
+        description = cleanText(attributes.content || '', 500);
+      }
+    }
+    if (title && description) break;
   }
-
   return { title: title || null, description: description || null };
 }
 
@@ -173,6 +223,8 @@ function getResponseHeaders(response: Response): Record<string, string> {
 }
 
 export const onRequestGet = async (context: PagesContext): Promise<Response> => {
+  const cancelledResponse = () => jsonResponse({ success: false, error: 'The inspection request was cancelled.' }, 499);
+  if (context.request.signal.aborted) return cancelledResponse();
   const requestUrl = new URL(context.request.url);
   const rawTarget = requestUrl.searchParams.get('url');
   if (!rawTarget) return jsonResponse({ success: false, error: 'Missing target url parameter.' }, 400);
@@ -187,8 +239,38 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
     }, 400);
   }
 
+  const egress = context.env?.URL_INSPECTOR_EGRESS;
+  let hosts: Set<string>;
+  try {
+    hosts = allowedHosts(context.env?.URL_INSPECTOR_ALLOWED_HOSTS);
+    if (typeof egress?.fetch !== 'function') throw new Error('Missing egress binding');
+  } catch {
+    return jsonResponse({ success: false, error: 'URL inspection is unavailable until secure egress is configured.' }, 503);
+  }
+  if (!hosts.has(target.hostname)) {
+    return jsonResponse({ success: false, error: 'This hostname is not approved for inspection.' }, 403);
+  }
+  if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
+    return jsonResponse({ success: false, error: 'The inspector is busy. Try again later.' }, 429);
+  }
+  activeRequests += 1;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let expire!: () => void;
+  let cancel!: () => void;
+  let interruption: 'cancelled' | 'timeout' | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    const stop = (reason: 'cancelled' | 'timeout') => {
+      if (interruption) return;
+      interruption = reason;
+      reject(new Error(reason));
+      controller.abort();
+    };
+    expire = () => stop('timeout');
+    cancel = () => stop('cancelled');
+  });
+  context.request.signal.addEventListener('abort', cancel, { once: true });
+  const timeoutId = setTimeout(expire, FETCH_TIMEOUT_MS);
+  const withinDeadline = <T>(work: Promise<T>): Promise<T> => Promise.race([work, deadline]);
   let upstreamResponse: Response | null = null;
   let finalTarget = target;
   const visited = new Set<string>();
@@ -201,26 +283,34 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       visited.add(finalTarget.href);
 
       // Never forward browser cookies, authorization, or arbitrary request headers.
-      const response = await fetch(finalTarget.href, {
+      const response = await withinDeadline(egress!.fetch(finalTarget.href, {
         method: 'GET',
         headers: { Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1' },
         redirect: 'manual',
         signal: controller.signal,
-      });
+      }).then((result) => {
+        if (controller.signal.aborted) cancelBody(result);
+        return result;
+      }));
+      if (response.status === 429 || response.status === 503) {
+        cancelBody(response);
+        return jsonResponse({ success: false, error: 'Inspection is temporarily unavailable or rate limited.' }, response.status);
+      }
 
       const location = response.headers.get('location');
       if (REDIRECT_STATUSES.has(response.status) && location) {
         if (redirectCount === MAX_REDIRECTS) {
-          await response.body?.cancel();
+          cancelBody(response);
           return jsonResponse({ success: false, error: 'The target redirected too many times.' }, 502);
         }
         try {
           finalTarget = validateTarget(new URL(location, finalTarget).href);
+          if (!hosts.has(finalTarget.hostname)) throw new InvalidTargetError('Unapproved redirect');
         } catch {
-          await response.body?.cancel();
+          cancelBody(response);
           return jsonResponse({ success: false, error: 'The target redirected to a blocked URL.' }, 502);
         }
-        await response.body?.cancel();
+        cancelBody(response);
         continue;
       }
       upstreamResponse = response;
@@ -235,13 +325,13 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
     let bodyTruncated = false;
 
     if (/^(text\/html|application\/xhtml\+xml)(?:\s*;|$)/i.test(contentType)) {
-      const result = await readHtmlPrefix(upstreamResponse);
+      const result = await readHtmlPrefix(upstreamResponse, withinDeadline);
       const metadata = extractPageMetadata(result.html);
       title = metadata.title;
       description = metadata.description;
       bodyTruncated = result.truncated;
     } else {
-      await upstreamResponse.body?.cancel();
+      cancelBody(upstreamResponse);
     }
 
     const edge = context.request.cf;
@@ -263,14 +353,19 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
       userAgent,
     });
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (interruption === 'cancelled') return cancelledResponse();
+    if (interruption === 'timeout') {
       return jsonResponse({ success: false, error: 'The target website took too long to respond.' }, 504);
     }
     return jsonResponse({ success: false, error: 'Could not fetch the target website. It may be unavailable or block automated requests.' }, 502);
   } finally {
     clearTimeout(timeoutId);
+    context.request.signal.removeEventListener('abort', cancel);
+    // End service work on success and early returns too, including stalled body cancellation.
+    controller.abort();
+    activeRequests -= 1;
     if (upstreamResponse?.body && !upstreamResponse.bodyUsed) {
-      await upstreamResponse.body.cancel().catch(() => undefined);
+      cancelBody(upstreamResponse);
     }
   }
 };

@@ -1,311 +1,495 @@
-import React, { Suspense, useMemo, useState } from 'react';
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Braces,
-  FileImage,
-  FileStack,
-  Globe2,
-  Hash,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Type,
-  WandSparkles,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
-import { BrowserRouter, Link, Route, Routes, useParams } from 'react-router-dom';
-import { TOOLS_REGISTRY } from '@/lib/registry';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrowserRouter, Link, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Search, Star, Terminal, X } from 'lucide-react';
+import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
+import { CommandPalette } from '@/components/CommandPalette';
+import { HeroLiveJsonPreview } from '@/components/HeroLiveJsonPreview';
+import { ToolCard } from '@/components/ToolCard';
 import { ToolLayout } from '@/components/ToolLayout';
+import { TOOLS_REGISTRY, type RegisteredTool, type ToolCategory } from '@/lib/registry';
+import { SITE_ORIGIN } from '@/lib/siteConfig';
+import { useToolPreferences } from '@/lib/storage';
 
-const legacyTools = [
-  { name: 'Word Counter', slug: 'word-counter', description: 'Count words, characters, sentences, and reading time.', icon: Type },
-  { name: 'Text Converter', slug: 'text-converter', description: 'Switch between readable and developer-friendly casing.', icon: WandSparkles },
-  { name: 'JSON Formatter', slug: 'json-formatter', description: 'Format, minify, and validate JSON in your browser.', icon: Braces },
-  { name: 'Slug Generator', slug: 'slug-generator', description: 'Turn a title into a clean, shareable URL slug.', icon: Hash },
-] satisfies { name: string; slug: string; description: string; icon: LucideIcon }[];
+const CATEGORY_TABS: Array<'All' | ToolCategory> = [
+  'All',
+  'Text',
+  'Dev',
+  'Encode',
+  'Security',
+  'Files',
+];
 
-const toolIcons: Record<string, LucideIcon> = {
-  'image-compressor': FileImage,
-  'pdf-merger': FileStack,
-  'url-screenshot': Globe2,
-};
+const HOME_TITLE = 'MicroTools Hub — Private Browser-Native Developer Utilities';
+const HOME_DESCRIPTION =
+  '15+ developer utilities that execute locally in your browser with WebCrypto, Web Workers, and verified WASM. Zero file uploads, zero telemetry, instant Command+K navigation.';
 
-function HomePage() {
-  const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All tools');
-  const categories = useMemo(
-    () => ['All tools', ...Array.from(new Set(TOOLS_REGISTRY.map((tool) => tool.category))).sort((a, b) => a.localeCompare(b))],
-    [],
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (hash && hash.length > 1) {
+      try {
+        const id = decodeURIComponent(hash.slice(1));
+        const target = document.getElementById(id);
+        if (target) {
+          target.scrollIntoView({ behavior: 'auto', block: 'start' });
+          return;
+        }
+      } catch {
+        // Ignore malformed percent-encoded fragments such as #%
+        return;
+      }
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname, hash]);
+  return null;
+}
+
+function HomePage({
+  onOpenCommandPalette,
+  favorites,
+  recents,
+  onToggleFavorite,
+}: {
+  onOpenCommandPalette: () => void;
+  favorites: string[];
+  recents: string[];
+  onToggleFavorite: (slug: string) => void;
+}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCategory = searchParams.get('category');
+  const [activeCategory, setActiveCategory] = useState<'All' | ToolCategory>(() => {
+    if (initialCategory && CATEGORY_TABS.includes(initialCategory as ToolCategory)) {
+      return initialCategory as ToolCategory;
+    }
+    return 'All';
+  });
+  const [filterQuery, setFilterQuery] = useState('');
+
+  useEffect(() => {
+    const paramCat = searchParams.get('category');
+    if (paramCat && CATEGORY_TABS.includes(paramCat as ToolCategory)) {
+      setActiveCategory(paramCat as ToolCategory);
+    } else if (!paramCat) {
+      setActiveCategory('All');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    document.title = HOME_TITLE;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', HOME_DESCRIPTION);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.setAttribute('href', `${SITE_ORIGIN}/`);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) {
+        return;
+      }
+      const searchInput = document.getElementById('tool-search') as HTMLInputElement | null;
+      if (searchInput) {
+        event.preventDefault();
+        searchInput.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const handleSelectCategory = (cat: 'All' | ToolCategory) => {
+    setActiveCategory(cat);
+    const next = new URLSearchParams(searchParams);
+    if (cat === 'All') {
+      next.delete('category');
+    } else {
+      next.set('category', cat);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: TOOLS_REGISTRY.length };
+    for (const cat of CATEGORY_TABS) {
+      if (cat !== 'All') {
+        counts[cat] = TOOLS_REGISTRY.filter((t) => t.category === cat).length;
+      }
+    }
+    return counts;
+  }, []);
+
+  const filteredTools = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    return TOOLS_REGISTRY.filter((tool) => {
+      const catMatch = activeCategory === 'All' || tool.category === activeCategory;
+      if (!catMatch) return false;
+      if (!q) return true;
+      return (
+        tool.name.toLowerCase().includes(q) ||
+        tool.slug.toLowerCase().includes(q) ||
+        tool.category.toLowerCase().includes(q) ||
+        (tool.useCase ?? tool.description).toLowerCase().includes(q) ||
+        tool.keywords.some((kw) => kw.toLowerCase().includes(q))
+      );
+    });
+  }, [activeCategory, filterQuery]);
+
+  const favoriteToolObjects = useMemo(
+    () =>
+      favorites
+        .map((slug) => TOOLS_REGISTRY.find((t) => t.slug === slug))
+        .filter((t): t is RegisteredTool => Boolean(t)),
+    [favorites],
   );
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredTools = useMemo(() => TOOLS_REGISTRY.filter((tool) => {
-    const matchesCategory = selectedCategory === 'All tools' || tool.category === selectedCategory;
-    const matchesQuery = !normalizedQuery || [tool.name, tool.description, tool.category, ...tool.keywords]
-      .some((value) => value.toLowerCase().includes(normalizedQuery));
-    return matchesCategory && matchesQuery;
-  }), [normalizedQuery, selectedCategory]);
-  const categoryCount = categories.length - 1;
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
-      <a href="#main-content" className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
-        Skip to content
-      </a>
-      <header className="sticky top-0 z-40 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
-        <nav className="hub-container flex h-16 items-center justify-between gap-2 sm:h-[4.5rem] sm:gap-5" aria-label="Main navigation">
-          <Link to="/" className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-xl sm:gap-3" aria-label="MicroTools Hub home">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-lime shadow-sm transition group-hover:-rotate-6 sm:h-10 sm:w-10 sm:rounded-2xl">
-              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-extrabold tracking-tight text-ink sm:text-lg">MicroTools<span className="text-brand">.</span></span>
-          </Link>
-          <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-6">
-            <a href="#toolbox" className="hidden text-sm font-semibold text-muted transition hover:text-brand sm:inline-flex">Explore tools</a>
-            <a href="#classic-tools" className="hidden text-sm font-semibold text-muted transition hover:text-brand md:inline-flex">Classic utilities</a>
-            <a href="#privacy" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 text-[11px] font-bold text-ink transition hover:border-brand/30 hover:text-brand sm:min-h-10 sm:gap-2 sm:px-4 sm:text-sm">
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand sm:h-4 sm:w-4" aria-hidden="true" />
-              <span>Privacy first</span>
+    <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pt-14">
+      {/* Task 3: Left-aligned Technical Hero + Right Live Mini JSON Formatter */}
+      <section aria-labelledby="hero-heading" className="grid min-w-0 items-center gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10">
+        <div className="min-w-0">
+          <div className="inline-flex max-w-full items-center gap-2 rounded-[6px] border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-muted sm:text-xs">
+            <span className="hub-local-dot shrink-0" aria-hidden="true" />
+            <span className="truncate">v2.4 · client-side developer workbench</span>
+          </div>
+
+          <h1
+            id="hero-heading"
+            className="mt-5 text-4xl font-semibold leading-[1.08] tracking-[-0.03em] text-ink sm:text-5xl lg:text-[3.35rem]"
+          >
+            Tools that don&apos;t <span className="hub-accent-text">steal</span> your data.
+          </h1>
+
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
+            15+ utilities that run 100% in your browser. No uploads. No tracking. Open source.
+          </p>
+
+          {/* Terminal-style Command Prompt trigger + Direct directory jump */}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              className="group flex h-11 flex-1 items-center justify-between gap-3 rounded-[8px] border border-line bg-surface px-3.5 font-mono text-xs text-ink transition-colors hover:border-brand hover:bg-surface-hover sm:max-w-sm"
+              aria-label="Launch command palette with Command K"
+            >
+              <span className="inline-flex items-center gap-2 truncate">
+                <Terminal className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden="true" />
+                <span className="text-muted">$</span>
+                <span className="truncate">microtools --open</span>
+              </span>
+              <kbd className="rounded-[5px] border border-line bg-paper px-1.5 py-0.5 text-[11px] text-muted group-hover:text-ink">
+                ⌘K
+              </kbd>
+            </button>
+
+            <a href="#tools-directory" className="hub-button-accent h-11 px-4 text-sm">
+              <span>Explore {TOOLS_REGISTRY.length} Utilities</span>
             </a>
           </div>
-        </nav>
-      </header>
 
-      <main id="main-content">
-        <section className="relative isolate overflow-hidden bg-ink text-white">
-          <div className="pointer-events-none absolute -right-32 -top-52 h-[30rem] w-[30rem] rounded-full border border-white/10" aria-hidden="true" />
-          <div className="pointer-events-none absolute -right-16 -top-36 h-[22rem] w-[22rem] rounded-full border border-white/10" aria-hidden="true" />
-          <div className="pointer-events-none absolute right-[12%] top-16 h-28 w-28 rounded-full bg-brand/40 blur-3xl" aria-hidden="true" />
-          <div className="hub-container relative grid min-w-0 gap-8 py-10 sm:gap-12 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:py-24">
-            <div className="w-full min-w-0 max-w-3xl">
-              <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-lime sm:mb-6 sm:px-3.5 sm:text-xs sm:tracking-[0.16em]">
-                <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_14px_rgba(217,242,122,.75)]" />
-                A calmer kind of toolbox
-              </div>
-              <h1 className="max-w-full text-[clamp(1.75rem,8.2vw,3rem)] font-black leading-[1.06] tracking-[-0.04em] [overflow-wrap:anywhere] sm:text-5xl lg:text-6xl">
-                Small tools.<br /><span className="text-lime">Serious momentum.</span>
-              </h1>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-white/70 sm:mt-6 sm:text-lg sm:leading-8">
-                The useful little utilities that turn busywork into done—without the clutter, accounts, or unnecessary uploads.
-              </p>
-              <a href="#toolbox" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-extrabold text-ink shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-[#e3f99a] focus-visible:outline-white sm:mt-8 sm:min-h-12 sm:rounded-2xl sm:px-5 sm:py-3">
-                Find your next tool <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </a>
-              <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-white/55 sm:mt-5">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden="true" />
-                <span>Files and text stay in your browser; URL inspection is disclosed before its edge fetch.</span>
-              </p>
-            </div>
-
-            <aside className="relative mx-auto w-full min-w-0 max-w-md lg:ml-auto" aria-label="Toolbox overview">
-              <div className="absolute -inset-4 rounded-[2.5rem] bg-white/[0.04] blur-xl" aria-hidden="true" />
-              <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.07] p-4 shadow-2xl backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
-                <div className="flex items-start justify-between gap-3 sm:gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">Your utility shelf</p>
-                    <p className="mt-2 break-words text-xl font-black tracking-tight text-white sm:text-2xl">Ready when you are.</p>
-                  </div>
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime text-ink"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3">
-                  <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
-                    <p className="text-2xl font-black tracking-tight text-lime sm:text-3xl">{TOOLS_REGISTRY.length}</p>
-                    <p className="mt-1 text-xs font-medium text-white/60">React tools</p>
-                  </div>
-                  <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
-                    <p className="text-2xl font-black tracking-tight text-lime sm:text-3xl">{categoryCount}</p>
-                    <p className="mt-1 text-xs font-medium text-white/60">Real categories</p>
-                  </div>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {TOOLS_REGISTRY.slice(0, 3).map((tool) => {
-                    const Icon = toolIcons[tool.slug] ?? Sparkles;
-                    return (
-                      <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-lime/40 hover:bg-white/[0.08]">
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lime"><Icon className="h-5 w-5" aria-hidden="true" /></span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-white">{tool.name}</span>
-                          <span className="mt-0.5 block truncate text-xs text-white/50">{tool.category}</span>
-                        </span>
-                        <ArrowUpRight className="h-4 w-4 shrink-0 text-white/35 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-lime" aria-hidden="true" />
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            </aside>
-          </div>
-        </section>
-
-        <section id="toolbox" className="hub-container min-w-0 scroll-mt-20 py-10 sm:scroll-mt-24 sm:py-20">
-          <div className="flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div className="min-w-0 max-w-2xl">
-              <p className="hub-eyebrow">The good stuff</p>
-              <h2 className="mt-3 text-[clamp(1.65rem,7vw,2.25rem)] font-black tracking-[-0.035em] text-ink sm:text-4xl">Find the right tool.</h2>
-              <p className="mt-3 text-sm leading-6 text-muted sm:text-base">A small, focused collection for the tasks that interrupt your flow.</p>
-            </div>
-            <div className="w-full min-w-0 lg:max-w-md">
-              <label htmlFor="tool-search" className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-muted">Search the toolbox</label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden="true" />
-                {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-muted hover:bg-paper hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /></button>}
-                <input
-                  id="tool-search"
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Try PDF, compress, or headers…"
-                  className="hub-input min-h-12 pl-12 pr-12 text-sm sm:min-h-14"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-7 flex flex-wrap gap-2" role="group" aria-label="Filter tools by category">
-            {categories.map((category) => {
-              const active = category === selectedCategory;
-              const count = category === 'All tools'
-                ? TOOLS_REGISTRY.length
-                : TOOLS_REGISTRY.filter((tool) => tool.category === category).length;
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 sm:gap-2 sm:px-4 ${active ? 'border-ink bg-ink text-white shadow-sm' : 'border-line bg-white text-muted hover:border-brand/35 hover:text-brand'}`}
-                >
-                  {category}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/15 text-lime' : 'bg-paper text-muted'}`}>{count}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mb-4 mt-8 flex items-center justify-between gap-4">
-            <p className="text-sm font-bold text-ink" aria-live="polite">{filteredTools.length} {filteredTools.length === 1 ? 'tool' : 'tools'} to explore</p>
-            {(query || selectedCategory !== 'All tools') && <button type="button" onClick={() => { setQuery(''); setSelectedCategory('All tools'); }} className="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand">Clear filters</button>}
-          </div>
-
-          {filteredTools.length ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredTools.map((tool) => {
-                const Icon = toolIcons[tool.slug] ?? Sparkles;
-                return (
-                  <Link key={tool.slug} to={`/tools/${tool.slug}`} className="group flex min-w-0 flex-col rounded-3xl border border-line bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:min-h-[16rem] sm:rounded-[1.75rem] sm:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand transition group-hover:bg-lime group-hover:text-ink"><Icon className="h-5 w-5" aria-hidden="true" /></span>
-                      <span className="rounded-full bg-paper px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">{tool.category}</span>
-                    </div>
-                    <div className="mt-4 min-w-0 flex-1 sm:mt-6">
-                      <h3 className="break-words text-lg font-extrabold tracking-tight text-ink group-hover:text-brand">{tool.name}</h3>
-                      <p className="mt-2 text-sm leading-6 text-muted">{tool.description}</p>
-                    </div>
-                    <span className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand sm:mt-5">Open tool <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-3xl border border-dashed border-line bg-white px-6 py-14 text-center">
-              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><Search className="h-5 w-5" aria-hidden="true" /></span>
-              <h3 className="mt-4 text-lg font-extrabold text-ink">Nothing in this search.</h3>
-              <p className="mt-1 text-sm text-muted">Try a different phrase or reset your filters.</p>
-              <button type="button" onClick={() => { setQuery(''); setSelectedCategory('All tools'); }} className="hub-button-secondary mt-5">Show every tool</button>
-            </div>
-          )}
-        </section>
-
-        <section id="classic-tools" className="hub-container min-w-0 scroll-mt-20 pb-10 sm:scroll-mt-24 sm:pb-20">
-          <div className="min-w-0 rounded-3xl border border-line bg-white p-4 shadow-soft sm:rounded-[2rem] sm:p-8">
-            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-              <div>
-                <p className="hub-eyebrow">Still useful. Still here.</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-ink sm:text-3xl">Classic utilities</h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-muted">The original quick helpers, kept lightweight and right where you left them.</p>
-              </div>
-              <span className="text-xs font-bold text-muted">{legacyTools.length} standalone pages</span>
-            </div>
-            <div className="mt-4 grid min-w-0 gap-2.5 sm:mt-6 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-              {legacyTools.map(({ name, slug, description, icon: Icon }) => (
-                <a key={slug} href={`/${slug}/`} className="group min-w-0 rounded-2xl border border-line bg-paper/70 p-3 transition hover:border-brand/25 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:p-4">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-brand shadow-sm transition group-hover:bg-brand group-hover:text-white sm:h-10 sm:w-10"><Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" /></span>
-                  <span className="mt-3 flex min-w-0 items-center justify-between gap-2 text-sm font-extrabold text-ink sm:mt-4">{name}<ArrowUpRight className="h-4 w-4 shrink-0 text-muted transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand" aria-hidden="true" /></span>
-                  <span className="mt-1 block text-xs leading-5 text-muted">{description}</span>
-                </a>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="privacy" className="hub-container min-w-0 scroll-mt-20 pb-12 sm:scroll-mt-24 sm:pb-20">
-          <div className="grid min-w-0 gap-4 rounded-3xl bg-brand-soft p-4 sm:gap-5 sm:rounded-[2rem] sm:p-8 lg:grid-cols-[auto_1fr] lg:items-start">
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
-            <div>
-              <p className="hub-eyebrow">Privacy, without the fine print</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-ink">Your files stay yours.</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Image, PDF, and text utilities run in your browser. The URL inspector is different: it sends the URL you enter to a Cloudflare Function to fetch limited page metadata. It does not forward your browser cookies or authorization headers.</p>
-              <a href="#toolbox" className="mt-4 inline-flex items-center gap-2 text-xs font-extrabold text-brand hover:underline">Back to the toolbox <ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-line bg-white">
-        <div className="hub-container flex flex-col gap-3 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-bold text-ink">MicroTools Hub <span className="font-normal text-muted">· Thoughtful little tools for everyday work.</span></p>
-          <p>Built for the browser. URL inspection uses a disclosed edge fetch.</p>
+          <p className="mt-3 font-mono text-[11px] leading-5 text-muted">
+            15 local WebCrypto/Worker/WASM tools + 1 disclosed fail-closed edge header inspector.
+          </p>
         </div>
-      </footer>
+
+        {/* Right Side: Live Animating + Interactive Mini JSON Formatter */}
+        <HeroLiveJsonPreview />
+      </section>
+
+      {/* Task 8: Favorites Row when favoriteTools.length > 0 */}
+      {favoriteToolObjects.length > 0 && (
+        <section
+          id="favorites"
+          aria-labelledby="favorites-heading"
+          className="mt-12 border-t border-line pt-8"
+        >
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+              <h2 id="favorites-heading" className="font-mono text-xs font-semibold uppercase tracking-wider text-ink">
+                Pinned Favorites ({favoriteToolObjects.length})
+              </h2>
+            </div>
+            <span className="font-mono text-[11px] text-muted">Saved in localStorage</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {favoriteToolObjects.map((tool) => (
+              <ToolCard
+                key={`fav-card-${tool.slug}`}
+                tool={tool}
+                isFavorite={true}
+                isRecent={recents.includes(tool.slug)}
+                onToggleFavorite={onToggleFavorite}
+                compact={true}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Task 4: Category Filter Chips + Inline Filter + Bento Grid */}
+      <section
+        id="tools-directory"
+        aria-labelledby="directory-heading"
+        className="mt-12 border-t border-line pt-8"
+      >
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-wider text-brand">
+              INDEX // {TOOLS_REGISTRY.length} UTILITIES
+            </p>
+            <h2 id="directory-heading" className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+              Developer Workbench Directory
+            </h2>
+          </div>
+
+          {/* Inline quick filter with solid #151518 surface for WCAG contrast */}
+          <div className="relative w-full lg:w-72">
+            <label htmlFor="tool-search" className="sr-only">
+              Filter utilities by name or keyword
+            </label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            />
+            <input
+              id="tool-search"
+              type="search"
+              value={filterQuery}
+              onChange={(event) => setFilterQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && filterQuery) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setFilterQuery('');
+                }
+              }}
+              placeholder="Filter directory (e.g. jwt, sha256)…"
+              className="h-9 w-full rounded-[6px] border border-line bg-surface pl-8 pr-8 font-mono text-xs text-ink placeholder:text-muted focus:border-brand focus:outline-none"
+            />
+            {filterQuery && (
+              <button
+                type="button"
+                onClick={() => setFilterQuery('')}
+                aria-label="Clear directory filter"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-[4px] p-1 text-muted hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category Filter Tabs [All, Text, Dev, Encode, Security, Files] */}
+        <div
+          className="mt-5 flex flex-wrap items-center gap-1.5"
+          role="group"
+          aria-label="Filter tools by category"
+        >
+          {CATEGORY_TABS.map((cat) => {
+            const selected = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => handleSelectCategory(cat)}
+                aria-pressed={selected}
+                className={`inline-flex items-center gap-2 rounded-[8px] border px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
+                  selected
+                    ? 'border-brand bg-brand-soft text-ink'
+                    : 'border-line bg-surface text-muted hover:bg-surface-hover hover:text-ink'
+                }`}
+              >
+                <span>{cat}</span>
+                <span className="rounded-[4px] bg-paper px-1.5 py-0.5 text-[10px] text-muted">
+                  {categoryCounts[cat]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Bento Grid: popular tools take col-span-2 on md/lg */}
+        {filteredTools.length > 0 ? (
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {filteredTools.map((tool) => (
+              <ToolCard
+                key={tool.slug}
+                tool={tool}
+                isFavorite={favorites.includes(tool.slug)}
+                isRecent={recents.includes(tool.slug)}
+                onToggleFavorite={onToggleFavorite}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-[10px] border border-dashed border-line bg-surface p-10 text-center">
+            <p className="font-mono text-sm text-ink">
+              No utilities matched &ldquo;{filterQuery}&rdquo; in {activeCategory}.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterQuery('');
+                handleSelectCategory('All');
+              }}
+              className="hub-button-primary mt-4 px-3.5 py-1.5 font-mono text-xs"
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function NotFoundPage() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-paper p-6 text-center">
-      <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand"><Search className="h-6 w-6" aria-hidden="true" /></span>
-      <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.18em] text-brand">404 · Missing in action</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight text-ink">That page wandered off.</h1>
-      <p className="mt-2 max-w-md text-sm leading-6 text-muted">The address may be incorrect, or this tool may have moved.</p>
-      <Link className="hub-button-primary mt-6" to="/">Browse all tools <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-    </main>
-  );
-}
-
-function ToolRoute() {
+function ToolRoute({
+  favorites,
+  onToggleFavorite,
+  onRecordRecent,
+}: {
+  favorites: string[];
+  onToggleFavorite: (slug: string) => void;
+  onRecordRecent: (slug: string) => void;
+}) {
   const { slug } = useParams<{ slug: string }>();
   const tool = TOOLS_REGISTRY.find((entry) => entry.slug === slug);
 
+  useEffect(() => {
+    if (tool) {
+      onRecordRecent(tool.slug);
+    }
+  }, [tool, onRecordRecent]);
+
   if (!tool) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-paper p-4 text-center">
-        <p className="hub-eyebrow">404 · Tool not found</p>
-        <h1 className="mt-2 text-2xl font-black text-ink">That tool isn’t on the shelf.</h1>
-        <p className="mt-2 text-sm text-muted">It may have moved, or the URL may be misspelled.</p>
-        <Link className="hub-button-secondary mt-5" to="/">Return to MicroTools Hub</Link>
-      </div>
-    );
+    return <NotFoundPage />;
   }
 
-  const { Component } = tool;
+  const ActiveComponent = tool.Component;
+
   return (
-    <ToolLayout meta={tool}>
-      <Suspense fallback={<div className="py-16 text-center text-sm text-muted" role="status">Loading tool…</div>}>
-        <Component />
+    <ToolLayout
+      tool={tool}
+      isFavorite={favorites.includes(tool.slug)}
+      onToggleFavorite={onToggleFavorite}
+    >
+      <Suspense
+        fallback={
+          <div
+            className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
+            role="status"
+            aria-label="Loading tool workbench"
+          >
+            <div className="h-[360px] animate-pulse rounded-[10px] border border-line bg-surface" />
+            <div className="hidden h-9 w-9 self-center rounded-[8px] border border-line bg-surface lg:block" />
+            <div className="h-[360px] animate-pulse rounded-[10px] border border-line bg-surface" />
+          </div>
+        }
+      >
+        <ActiveComponent />
       </Suspense>
     </ToolLayout>
   );
 }
 
+function NotFoundPage() {
+  useEffect(() => {
+    document.title = '404 — Route Not Found | MicroTools Hub';
+  }, []);
+
+  return (
+    <div className="mx-auto max-w-xl px-4 py-20 text-center sm:px-6">
+      <p className="font-mono text-xs uppercase tracking-wider text-brand">HTTP 404</p>
+      <h1 className="mt-2 text-2xl font-semibold text-ink">Utility route not found</h1>
+      <p className="mt-2 text-sm text-muted">
+        The requested path does not match any registered developer utility.
+      </p>
+      <div className="mt-6 flex justify-center">
+        <Link to="/" className="hub-button-accent px-4 py-2 text-sm">
+          Return to Directory
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const { favoriteTools, recentTools, toggleFavorite, markRecent } = useToolPreferences();
+
+  const openCommandPalette = useCallback(() => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      returnFocusRef.current = document.activeElement;
+    }
+    setPaletteOpen(true);
+  }, []);
+
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/tools/:slug" element={<ToolRoute />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <div className="min-h-screen bg-paper text-ink">
+        <ScrollToTop />
+        <div ref={shellRef} data-app-shell="true" className="flex min-h-screen flex-col">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-[8px] focus:border focus:border-brand focus:bg-surface focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:text-ink"
+          >
+            Skip to workbench
+          </a>
+
+          <SiteHeader
+            onOpenCommandPalette={openCommandPalette}
+            favoritesCount={favoriteTools.length}
+          />
+
+          <main id="main-content" className="flex-1">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <HomePage
+                    onOpenCommandPalette={openCommandPalette}
+                    favorites={favoriteTools}
+                    recents={recentTools}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                }
+              />
+              <Route
+                path="/tools/:slug"
+                element={
+                  <ToolRoute
+                    favorites={favoriteTools}
+                    onToggleFavorite={toggleFavorite}
+                    onRecordRecent={markRecent}
+                  />
+                }
+              />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </main>
+
+          <SiteFooter />
+        </div>
+
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          favorites={favoriteTools}
+          recents={recentTools}
+          returnFocusRef={returnFocusRef}
+          shellRef={shellRef}
+        />
+      </div>
     </BrowserRouter>
   );
 }

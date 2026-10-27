@@ -1,13 +1,25 @@
 export const meta = {
   slug: 'pdf-merger',
   name: 'PDF Merger & Page Organizer',
-  description: 'Combine multiple PDF files into a single document instantly in your browser. 100% private, client-side PDF joining using pdf-lib with zero server uploads.',
-  category: 'PDF',
+  description: 'Combine multiple PDF files into one document in your browser. Client-side PDF joining with pdf-lib; your documents are not uploaded.',
+  useCase: 'Count pages, reorder PDF documents, and merge vector pages in-memory with pdf-lib.',
+  codePreview: '[alpha.pdf, beta.pdf] → merged-document.pdf',
+  category: 'Files',
+  privacy: {
+    mode: 'local',
+    label: 'Local PDF processing',
+    description: 'PDF files are read and merged in your browser. Your documents are not uploaded.',
+  },
   keywords: [
     'merge pdf',
     'combine pdf files',
     'client side pdf merger',
     'free pdf joiner',
+  ],
+  steps: [
+    { title: 'Drop two or more PDF files', detail: 'Background workers inspect page counts without uploading confidential documents.' },
+    { title: 'Arrange document sequence', detail: 'Reorder files with keyboard-accessible Up/Down controls or remove unwanted items.' },
+    { title: 'Export lossless merged PDF', detail: 'pdf-lib copies vector and text streams directly without rasterizing pages.' },
   ],
   faqs: [
     {
