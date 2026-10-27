@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CodeWorkbench } from '@/components/CodeWorkbench';
-import { evaluateRegex } from '@/lib/devToolsLogic';
 import { emitLocalActivityPulse } from '@/lib/storage';
+import { runRegexInWorker, type RegexEvaluation } from './workerClient';
 
 const SAMPLE_CORPUS = `[2026-10-27T09:14:02Z] INFO: worker booted in 14ms
 [2026-10-27T09:14:09Z] WARN: retry_budget=2 host=api.internal
@@ -12,10 +12,26 @@ export default function RegexTesterTool() {
   const [flags, setFlags] = useState('gm');
   const [input, setInput] = useState('');
 
-  const computed = useMemo(() => {
-    const start = performance.now();
-    const res = evaluateRegex(pattern, flags, input);
-    return { ...res, execMs: Math.max(0.05, performance.now() - start) };
+  const [computed, setComputed] = useState<RegexEvaluation>({ output: '', error: null, execMs: 0 });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setComputed({ output: '', error: null, execMs: 0, detail: 'Evaluating in local worker…' });
+    void runRegexInWorker(pattern, flags, input, controller.signal).then(
+      (result) => {
+        if (!controller.signal.aborted) setComputed(result);
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
+        setComputed({
+          output: '',
+          error: error instanceof Error ? error.message : 'Regex evaluation failed.',
+          execMs: 0,
+          detail: 'Evaluation stopped',
+        });
+      },
+    );
+    return () => controller.abort();
   }, [pattern, flags, input]);
 
   return (

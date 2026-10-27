@@ -176,6 +176,10 @@
   }
 
   /* cmdk Command Palette styling */
+  .command-palette-dialog::backdrop {
+    @apply bg-black/75 backdrop-blur-sm;
+  }
+
   [cmdk-root] {
     @apply flex w-full flex-col overflow-hidden rounded-[10px] border border-line bg-surface text-ink;
     box-shadow: 0 0 0 1px rgb(139 92 246 / 0.25), 0 24px 64px rgb(0 0 0 / 0.75);

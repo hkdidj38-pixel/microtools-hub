@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createServer as createNetServer } from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -319,9 +320,37 @@ try {
   const storedFavs = await page.evaluate(() => JSON.parse(localStorage.getItem('favoriteTools') || '[]'));
   assert.deepEqual(storedFavs, ['jwt-decoder']);
 
+  const dialog = page.getByRole('dialog', { name: 'Command palette' });
+  const paletteOpener = page.getByRole('button', { name: 'Open command palette search (Command K)' });
+  await paletteOpener.click();
+  await dialog.waitFor();
+  assert.equal(await dialog.locator('[cmdk-input]').evaluate((element) => element === document.activeElement), true);
+  for (const key of ['Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
+    await page.keyboard.press(key);
+    assert.equal(await dialog.evaluate((element) => element.contains(document.activeElement)), true, `${key} must keep focus inside the palette.`);
+  }
+  await page.locator('#tool-search').evaluate((element) => element.focus());
+  assert.equal(await dialog.evaluate((element) => element.contains(document.activeElement)), true, 'Background content must be inert while the palette is open.');
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await paletteOpener.evaluate((element) => element === document.activeElement), true, 'Escape must restore the mouse opener.');
+
+  for (const shortcut of ['Control+k', 'Meta+k']) {
+    await page.locator('#tool-search').focus();
+    await page.keyboard.press(shortcut);
+    await dialog.waitFor();
+    await page.getByRole('button', { name: 'Close command palette', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'tool-search', `${shortcut} must restore its original focus.`);
+  }
+  await paletteOpener.click();
+  await dialog.waitFor();
+  await dialog.click({ position: { x: 5, y: 5 } });
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await paletteOpener.evaluate((element) => element === document.activeElement), true, 'Outside click must restore focus.');
+
   // Open Command Palette via Control+k, fuzzy search "sha256", and navigate
   await page.keyboard.press('Control+k');
-  const dialog = page.getByRole('dialog', { name: 'Command palette' });
   await dialog.waitFor();
   assert.match(await dialog.innerText(), /Favorites/i);
   await dialog.locator('[cmdk-input]').fill('sha256');
@@ -370,6 +399,68 @@ try {
   assert.notEqual(mobileStack.swapTransform, 'none', 'Swap icon must rotate 90deg when stacked vertically on mobile.');
   await page.setViewportSize({ width: 1440, height: 980 });
   console.log('[ui] CodeWorkbench sample data, sticky offline proof pulse, and mobile rotated swap stack verified');
+
+  // Review regressions: preserve original file bytes, query keys, Unicode, and responsive regex evaluation.
+  const waitForOutput = (expected) => page.waitForFunction(
+    (value) => document.querySelector('textarea[aria-label="Tool output"]')?.value.includes(value),
+    expected,
+  );
+  await page.goto(`${baseURL}/tools/hash-generator`, { waitUntil: 'networkidle' });
+  for (const [name, buffer] of [
+    ['binary.bin', Buffer.from([0xff, 0x00, 0xfe])],
+    ['bom.txt', Buffer.from([0xef, 0xbb, 0xbf, 0x61])],
+    ['empty.bin', Buffer.alloc(0)],
+  ]) {
+    await page.locator('input[type="file"]').setInputFiles({ name, mimeType: 'application/octet-stream', buffer });
+    await waitForOutput(createHash('sha256').update(buffer).digest('hex'));
+    assert.match(await page.getByRole('region', { name: 'Input panel' }).innerText(), /FILE BYTES/);
+  }
+  await page.getByRole('button', { name: 'Base64 (SRI)', exact: true }).click();
+  await waitForOutput(createHash('sha256').update(Buffer.alloc(0)).digest('base64'));
+  await page.getByLabel('Tool input', { exact: true }).fill('abc');
+  await waitForOutput(createHash('sha256').update('abc').digest('base64'));
+  assert.match(await page.getByRole('region', { name: 'Input panel' }).innerText(), /PLAINTEXT/);
+
+  await page.goto(`${baseURL}/tools/html-entities`, { waitUntil: 'networkidle' });
+  await page.getByLabel('Tool input', { exact: true }).fill('🔒');
+  assert.equal(await page.getByLabel('Tool output', { exact: true }).inputValue(), '&#x1F512;');
+  assert.equal(await page.evaluate(() => {
+    const element = document.createElement('textarea');
+    element.innerHTML = document.querySelector('textarea[aria-label="Tool output"]').value;
+    return element.value;
+  }), '🔒', 'Encoded entities must roundtrip through the browser HTML parser.');
+
+  await page.goto(`${baseURL}/tools/url-codec`, { waitUntil: 'networkidle' });
+  await page.getByLabel('Tool input', { exact: true }).fill('?redirect=https://example.com/path&state=ok&__proto__=first&__proto__=second&constructor=value&toString=text');
+  const parsedQuery = JSON.parse(await page.getByLabel('Tool output', { exact: true }).inputValue()).query;
+  assert.equal(parsedQuery.redirect, 'https://example.com/path');
+  assert.equal(parsedQuery.state, 'ok');
+  assert.deepEqual(parsedQuery.__proto__, ['first', 'second']);
+  assert.equal(parsedQuery.constructor, 'value');
+  assert.equal(parsedQuery.toString, 'text');
+
+  await page.goto(`${baseURL}/tools/regex-tester`, { waitUntil: 'networkidle' });
+  await page.getByLabel('Regular expression pattern', { exact: true }).fill('(?:)');
+  await page.getByLabel('Regular expression flags', { exact: true }).fill('gu');
+  await page.getByLabel('Tool input', { exact: true }).fill('🔒');
+  await waitForOutput('"index": 2');
+  const zeroLengthMatches = JSON.parse(await page.getByLabel('Tool output', { exact: true }).inputValue());
+  assert.deepEqual(zeroLengthMatches.map((match) => match.index), [0, 2]);
+
+  await page.getByLabel('Regular expression flags', { exact: true }).fill('g');
+  await page.getByLabel('Regular expression pattern', { exact: true }).fill('(a+)+$');
+  await page.getByLabel('Tool input', { exact: true }).fill('a'.repeat(35) + '!');
+  const timerElapsed = await page.evaluate(() => new Promise((resolve) => {
+    const start = performance.now();
+    setTimeout(() => resolve(performance.now() - start), 100);
+  }));
+  assert.ok(timerElapsed < 900, `Main-thread timer must remain responsive during backtracking (${timerElapsed}ms).`);
+  await page.getByRole('alert').filter({ hasText: 'Regex evaluation timed out after 1 second' }).waitFor({ timeout: 5_000 });
+  await page.getByLabel('Regular expression pattern', { exact: true }).fill('a+');
+  await waitForOutput('"match":');
+  assert.equal(JSON.parse(await page.getByLabel('Tool output', { exact: true }).inputValue())[0].match, 'a'.repeat(35));
+  assert.equal(await page.getByRole('alert').count(), 0);
+  console.log('[ui] raw binary/BOM/empty-file hashes, text-mode reset, Unicode HTML/query/regex, regex timeout and recovery verified');
 
   // 7. Existing Binary & Edge Tools: Image Compressor, PDF Merger, Media Converter, URL Inspector
   await page.goto(`${baseURL}/tools/image-compressor/`, { waitUntil: 'networkidle' });

@@ -146,11 +146,11 @@ function toBase64(buffer: ArrayBuffer): string {
 }
 
 export async function computeHashes(
-  input: string,
+  input: string | ArrayBuffer,
   encoding: 'hex' | 'base64' = 'hex',
 ): Promise<TransformOutcome> {
-  if (!input) return { output: '', error: null };
-  const data = new TextEncoder().encode(input);
+  if (input === '') return { output: '', error: null };
+  const data = typeof input === 'string' ? new TextEncoder().encode(input) : input;
   const algorithms = ['SHA-256', 'SHA-384', 'SHA-512', 'SHA-1'] as const;
   const digests = await Promise.all(
     algorithms.map(async (alg) => {
@@ -225,11 +225,12 @@ export function transformUrl(
     }
 
     const candidate = input.trim();
-    const url = candidate.includes('://')
+    const isFullUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(candidate);
+    const url = isFullUrl
       ? new URL(candidate)
       : new URL(candidate.startsWith('?') ? `https://local.invalid/${candidate}` : `https://local.invalid/?${candidate}`);
 
-    const params: Record<string, string | string[]> = {};
+    const params: Record<string, string | string[]> = Object.create(null);
     for (const [key, val] of url.searchParams.entries()) {
       const existing = params[key];
       if (existing === undefined) params[key] = val;
@@ -237,7 +238,7 @@ export function transformUrl(
       else params[key] = [existing, val];
     }
 
-    const parsed = candidate.includes('://')
+    const parsed = isFullUrl
       ? {
           protocol: url.protocol,
           host: url.host,
@@ -273,7 +274,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 export function transformHtmlEntities(input: string, mode: 'encode' | 'decode'): TransformOutcome {
   if (!input) return { output: '', error: null };
   if (mode === 'encode') {
-    const encoded = input.replace(/[&<>"']|[^\x20-\x7E\n\r\t]/g, (ch) => {
+    const encoded = input.replace(/[&<>"']|[^\x20-\x7E\n\r\t]/gu, (ch) => {
       switch (ch) {
         case '&':
           return '&amp;';
@@ -334,7 +335,11 @@ export function evaluateRegex(pattern: string, flags: string, corpus: string): T
         captures: current.slice(1).map((item) => item ?? null),
         groups: current.groups ? { ...current.groups } : undefined,
       });
-      if (current[0].length === 0) regex.lastIndex += 1;
+      if (current[0].length === 0) {
+        const unicode = safeFlags.includes('u') || safeFlags.includes('v');
+        const codePoint = corpus.codePointAt(regex.lastIndex);
+        regex.lastIndex += unicode && codePoint !== undefined && codePoint > 0xffff ? 2 : 1;
+      }
       if (!flags.includes('g')) break;
     }
 
@@ -462,16 +467,19 @@ export function transformCase(
 
 export function computeLineDiff(input: string): TransformOutcome {
   if (!input.trim()) return { output: '', error: null };
-  const parts = input.split(/\r?\n===\r?\n/);
-  if (parts.length < 2) {
+  const separator = /\r?\n===\r?\n/.exec(input);
+  if (!separator) {
     return {
       output: '',
       error: 'Separate the original and modified blocks with a line containing ===',
     };
   }
 
-  const left = parts[0].split(/\r?\n/);
-  const right = parts.slice(1).join('\n===\n').split(/\r?\n/);
+  // Include each line's terminator in the comparison so newline-only changes
+  // survive export, and an empty block represents zero lines.
+  const splitLines = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const left = splitLines(input.slice(0, separator.index));
+  const right = splitLines(input.slice(separator.index + separator[0].length));
 
   if (left.length * right.length > 250_000) {
     return { output: '', error: 'Diff input exceeds 500×500 line interactive matrix cap.' };
@@ -486,7 +494,16 @@ export function computeLineDiff(input: string): TransformOutcome {
     }
   }
 
-  const out: string[] = ['--- a/original', '+++ b/modified'];
+  const out: string[] = [
+    '--- a/original',
+    '+++ b/original',
+    `@@ -${m ? 1 : 0},${m} +${n ? 1 : 0},${n} @@`,
+  ];
+  const appendLine = (prefix: string, line: string) => {
+    const hasNewline = line.endsWith('\n');
+    out.push(prefix + (hasNewline ? line.slice(0, -1) : line));
+    if (!hasNewline) out.push('\\ No newline at end of file');
+  };
   let added = 0;
   let removed = 0;
   let unchanged = 0;
@@ -494,33 +511,33 @@ export function computeLineDiff(input: string): TransformOutcome {
   let j = 0;
   while (i < m && j < n) {
     if (left[i] === right[j]) {
-      out.push(`  ${left[i]}`);
+      appendLine(' ', left[i]);
       unchanged += 1;
       i += 1;
       j += 1;
     } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      out.push(`- ${left[i]}`);
+      appendLine('-', left[i]);
       removed += 1;
       i += 1;
     } else {
-      out.push(`+ ${right[j]}`);
+      appendLine('+', right[j]);
       added += 1;
       j += 1;
     }
   }
   while (i < m) {
-    out.push(`- ${left[i]}`);
+    appendLine('-', left[i]);
     removed += 1;
     i += 1;
   }
   while (j < n) {
-    out.push(`+ ${right[j]}`);
+    appendLine('+', right[j]);
     added += 1;
     j += 1;
   }
 
   return {
-    output: out.join('\n'),
+    output: added || removed ? `${out.join('\n')}\n` : '',
     error: null,
     detail: `+${added} added · -${removed} removed · ${unchanged} unchanged`,
   };

@@ -24,6 +24,8 @@ interface CodeWorkbenchProps {
   inputPlaceholder?: string;
   input: string;
   onInputChange: (next: string) => void;
+  onFileUpload?: (file: File) => Promise<void>;
+  inputByteLength?: number;
   output: string;
   error?: string | null;
   execMs?: number;
@@ -52,6 +54,8 @@ export function CodeWorkbench({
   inputPlaceholder = 'Paste or type payload here…',
   input,
   onInputChange,
+  onFileUpload,
+  inputByteLength,
   output,
   error = null,
   execMs = 0.12,
@@ -76,7 +80,7 @@ export function CodeWorkbench({
 
   const inputLines = useMemo(() => Math.min(Math.max(countLines(input), 12), 600), [input]);
   const outputLines = useMemo(() => Math.min(Math.max(countLines(output), 12), 600), [output]);
-  const inputBytes = useMemo(() => byteLength(input), [input]);
+  const inputBytes = useMemo(() => inputByteLength ?? byteLength(input), [input, inputByteLength]);
   const outputBytes = useMemo(() => byteLength(output), [output]);
 
   const updateInput = (value: string) => {
@@ -123,11 +127,21 @@ export function CodeWorkbench({
   const handleFileUpload = async (file: File | undefined) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      setClipboardError('Text file exceeds the 5 MiB editor limit.');
+      setClipboardError('File exceeds the 5 MiB input limit.');
       return;
     }
-    const text = await file.text();
-    updateInput(text);
+    setClipboardError(null);
+    try {
+      if (onFileUpload) {
+        emitLocalActivityPulse();
+        await onFileUpload(file);
+      } else {
+        const text = await file.text();
+        updateInput(text);
+      }
+    } catch {
+      setClipboardError('Could not read this file. Try selecting it again.');
+    }
   };
 
   const handleSwap = () => {
