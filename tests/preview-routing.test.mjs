@@ -68,6 +68,20 @@ test('preview serves clean URLs and handles malformed requests without server er
   assert.equal(legacy.status, 308);
   assert.equal(legacy.headers.get('location'), '/legacy/?keep=1');
 
+  for (const route of ['/%2Flegacy', '/%2flegacy', '/%2F%2Flegacy']) {
+    for (const method of ['GET', 'HEAD']) {
+      const response = await fetch(`${origin}${route}?keep=1&next=%2Ftools`, { method, redirect: 'manual' });
+      assert.equal(response.status, 308, `${method} ${route} must preserve directory redirects`);
+      const location = response.headers.get('location');
+      assert.equal(new URL(location, origin).origin, origin, `${method} ${route} must stay on the preview origin`);
+      assert.equal(location, `${route}/?keep=1&next=%2Ftools`);
+      assert.equal(await response.text(), '');
+      const redirected = await fetch(new URL(location, origin), { method });
+      assert.equal(redirected.status, 200);
+      assert.equal(await redirected.text(), method === 'HEAD' ? '' : '<h1>Legacy</h1>');
+    }
+  }
+
   const missing = await fetch(`${origin}/unknown`);
   assert.equal(missing.status, 404);
   assert.equal(missing.headers.get('x-robots-tag'), 'noindex, nofollow');

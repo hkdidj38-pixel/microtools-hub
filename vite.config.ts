@@ -129,7 +129,9 @@ function cloudflarePagesPreviewPlugin(): Plugin {
               fs.existsSync(path.join(candidatePath, 'index.html'))
             ) {
               res.statusCode = 308;
-              res.setHeader('location', `${resolvedPathname}/${requestUrl.search}`);
+              // Keep encoded separators encoded so a leading %2F cannot become
+              // a protocol-relative URL that redirects to another origin.
+              res.setHeader('location', `${requestUrl.pathname}/${requestUrl.search}`);
               res.end();
               return;
             }
