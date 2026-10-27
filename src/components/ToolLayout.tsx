@@ -1,146 +1,238 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, HelpCircle, ShieldCheck } from 'lucide-react';
-import { SiteHeader } from '@/components/SiteHeader';
-import { SiteFooter } from '@/components/SiteFooter';
-import { useScrollReveal } from '@/lib/useScrollReveal';
-import { getCategoryAccent } from '@/lib/categoryStyles';
+import { ChevronRight, Star } from 'lucide-react';
 import type { ToolMeta } from '@/lib/registry';
+import { useLocalActivityPulse } from '@/lib/storage';
+
+const SITE_ORIGIN = 'https://microtools-hub-d6l.pages.dev';
+
+export function buildToolDocumentTitle(tool: ToolMeta): string {
+  if (tool.privacy.mode === 'edge') {
+    return `${tool.name} - Fail-Closed Edge Metadata | MicroTools Hub`;
+  }
+  return `${tool.name} - Private, Offline & Free | MicroTools Hub`;
+}
 
 interface ToolLayoutProps {
-  meta: ToolMeta;
+  tool: ToolMeta;
+  isFavorite: boolean;
+  onToggleFavorite: (slug: string) => void;
   children: React.ReactNode;
 }
 
-export const ToolLayout: React.FC<ToolLayoutProps> = ({ meta, children }) => {
-  const isEdgeTool = meta.privacy.mode === 'edge';
-  const faqRevealRef = useScrollReveal<HTMLElement>();
-  const accent = getCategoryAccent(meta.category);
+export function ToolLayout({
+  tool,
+  isFavorite,
+  onToggleFavorite,
+  children,
+}: ToolLayoutProps) {
+  const isPulsing = useLocalActivityPulse();
+  const isEdge = tool.privacy.mode === 'edge';
 
   useEffect(() => {
-    document.title = `${meta.name} — MicroTools Hub`;
-    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    description?.setAttribute('content', meta.description);
-    window.scrollTo(0, 0);
-  }, [meta]);
+    document.title = buildToolDocumentTitle(tool);
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', tool.description);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.setAttribute('href', `${SITE_ORIGIN}/tools/${tool.slug}`);
+  }, [tool]);
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: tool.name,
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Any (Web Browser)',
+        url: `${SITE_ORIGIN}/tools/${tool.slug}`,
+        description: tool.description,
+        isAccessibleForFree: true,
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: tool.faqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.q,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.a,
+          },
+        })),
+      },
+    ],
+  };
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col bg-paper text-ink">
-      <a
-        href="#tool-main"
-        className="sr-only z-50 rounded-xl bg-white px-4 py-3 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
-      >
-        Skip to tool
-      </a>
-      <SiteHeader variant="tool" privacy={meta.privacy} />
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
-      <main id="tool-main" className="hub-container min-w-0 w-full flex-1 py-5 sm:py-10 lg:py-12">
-        <div className="mx-auto min-w-0 max-w-5xl">
-          <nav
-            aria-label="Breadcrumb"
-            className="mb-5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-muted sm:mb-7"
-          >
-            <Link to="/" className="rounded-sm font-sans font-semibold transition hover:text-brand-dark">
-              All tools
+      <div className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-7 sm:px-6 sm:py-9">
+        {/* Breadcrumb + Favorite Star */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap items-center gap-1.5 font-mono text-xs text-muted">
+            <Link to="/" className="hover:text-ink">
+              microtools
             </Link>
-            <span aria-hidden="true" className="text-muted/50">/</span>
-            <span>{meta.category}</span>
-            <span aria-hidden="true" className="text-muted/50">/</span>
-            <span aria-current="page" className="min-w-0 break-words font-sans font-semibold text-ink">
-              {meta.name}
-            </span>
+            <ChevronRight className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+            <Link to={`/?category=${encodeURIComponent(tool.category)}`} className="lowercase hover:text-ink">
+              {tool.category}
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+            <span className="text-ink">{tool.slug}</span>
           </nav>
 
-          <div className="mb-5 grid min-w-0 gap-4 motion-safe:animate-hub-enter sm:mb-7 sm:gap-5 md:grid-cols-[1fr_auto] md:items-end">
-            <div className="min-w-0 max-w-3xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] ${accent.badge}`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} aria-hidden="true" />
-                  {meta.category} toolkit
-                </span>
-              </div>
-              <h1 className="mt-3 break-words text-[clamp(1.7rem,7.5vw,3.1rem)] font-black leading-[1.08] tracking-[-0.04em] text-ink sm:text-4xl lg:text-5xl">
-                {meta.name}
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted sm:text-base sm:leading-7">
-                {meta.description}
-              </p>
-            </div>
-            <Link
-              to="/#toolbox"
-              className="inline-flex min-h-10 w-fit items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-xs font-extrabold text-ink shadow-sm transition hover:border-brand/35 hover:bg-sage/55 hover:text-brand-dark md:mb-1"
-            >
-              Explore more tools <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-
-          <aside
-            className={`mb-4 flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 motion-safe:animate-hub-enter sm:mb-5 sm:px-5 ${
-              isEdgeTool
-                ? 'border-peach-ink/20 bg-peach/75 text-peach-ink'
-                : 'border-brand/15 bg-sage/75 text-brand-dark'
+          <button
+            type="button"
+            onClick={() => onToggleFavorite(tool.slug)}
+            aria-pressed={isFavorite}
+            className={`inline-flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1 font-mono text-xs transition-colors ${
+              isFavorite
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                : 'border-line bg-surface text-muted hover:bg-surface-hover hover:text-ink'
             }`}
-            style={{ animationDelay: '70ms' }}
-            aria-label="How this tool handles your data"
           >
-            <ShieldCheck
-              className={`mt-0.5 h-4 w-4 shrink-0 ${isEdgeTool ? 'text-peach-ink' : 'text-brand'}`}
+            <Star
+              className={`h-3.5 w-3.5 ${isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
               aria-hidden="true"
             />
-            <div className="min-w-0">
-              <p className="font-bold">{meta.privacy.label}</p>
-              <p className="mt-0.5 text-xs leading-5 sm:text-sm">{meta.privacy.description}</p>
-            </div>
-          </aside>
+            <span>{isFavorite ? 'Starred' : 'Star tool'}</span>
+          </button>
+        </div>
 
-          <section
-            className="min-w-0 rounded-3xl border border-line bg-white p-3 shadow-soft motion-safe:animate-hub-enter sm:rounded-hub-panel sm:p-5 lg:p-7"
-            style={{ animationDelay: '120ms' }}
-            aria-label={`${meta.name} workspace`}
-          >
-            {children}
+        {/* Unique H1 + concise technical summary */}
+        <header className="mt-4 border-b border-line pb-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-[5px] border border-line bg-surface px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-muted">
+              {tool.category}
+            </span>
+            <span
+              className={`rounded-[5px] border px-2 py-0.5 font-mono text-[11px] ${
+                isEdge
+                  ? 'border-amber-500/35 bg-amber-500/10 text-amber-200'
+                  : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+              }`}
+            >
+              {tool.privacy.label}
+            </span>
+          </div>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+            {tool.name}
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted sm:text-base">
+            {tool.description}
+          </p>
+        </header>
+
+        {/* Main Tool Workbench */}
+        <section className="mt-6 min-w-0" aria-label={`${tool.name} workbench`}>
+          {children}
+        </section>
+
+        {/* Below Workbench: 3-step How It Works + SEO FAQ */}
+        <div className="mt-12 grid min-w-0 gap-8 border-t border-line pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+          {/* 3-Step How It Works */}
+          <section className="min-w-0" aria-labelledby="how-it-works-heading">
+            <p className="font-mono text-xs uppercase tracking-wider text-brand">
+              PIPELINE
+            </p>
+            <h2 id="how-it-works-heading" className="mt-1 text-lg font-semibold text-ink">
+              How it works
+            </h2>
+            <ol className="mt-4 space-y-3">
+              {(tool.steps ?? []).map((step, index) => (
+                <li
+                  key={step.title}
+                  className="rounded-[10px] border border-line bg-surface p-4"
+                >
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="font-mono text-xs font-semibold text-brand">
+                      0{index + 1}
+                    </span>
+                    <h3 className="text-sm font-semibold text-ink">{step.title}</h3>
+                  </div>
+                  <p className="mt-1.5 pl-6 text-xs leading-relaxed text-muted">
+                    {step.detail}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </section>
 
-          {meta.faqs.length > 0 && (
-            <section ref={faqRevealRef} className="hub-scroll-reveal mt-8 sm:mt-11" aria-labelledby="faq-heading">
-              <div className="mb-4 flex min-w-0 items-end justify-between gap-4 sm:mb-5">
-                <div className="min-w-0">
-                  <p className="hub-eyebrow">Good to know</p>
-                  <h2
-                    id="faq-heading"
-                    className="mt-2 flex items-center gap-2 text-xl font-black tracking-tight text-ink sm:text-2xl"
-                  >
-                    <HelpCircle className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" /> Frequently asked questions
-                  </h2>
-                </div>
+          {/* Technical FAQ */}
+          <section className="min-w-0" aria-labelledby="tool-faq-heading">
+            <p className="font-mono text-xs uppercase tracking-wider text-brand">
+              SPECIFICATION &amp; PRIVACY
+            </p>
+            <h2 id="tool-faq-heading" className="mt-1 text-lg font-semibold text-ink">
+              Frequently asked questions
+            </h2>
+            <div className="mt-4 divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
+              {tool.faqs.map((faq) => (
+                <details key={faq.q} className="group p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+                    <span>{faq.q}</span>
+                    <span className="font-mono text-xs text-muted transition-transform group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-2.5 text-xs leading-relaxed text-muted sm:text-sm">
+                    {faq.a}
+                  </p>
+                </details>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {/* Task 7: Sticky Local Proof / Disclosed Edge Telemetry Bar */}
+      <div
+        className="sticky bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-md"
+        role="region"
+        aria-label="Execution privacy proof"
+      >
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2.5 font-mono text-xs sm:px-6">
+          {isEdge ? (
+            <>
+              <div className="flex items-center gap-2 text-amber-200">
+                <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
+                <span className="font-semibold">Disclosed Edge</span>
+                <span className="text-muted">·</span>
+                <span className="text-muted">
+                  Target URL is sent to this site’s fail-closed Cloudflare Function
+                </span>
               </div>
-              <div className="grid gap-2.5 md:grid-cols-2 md:gap-3">
-                {meta.faqs.map((faq) => (
-                  <details
-                    key={faq.q}
-                    className="group min-w-0 rounded-2xl border border-line bg-white transition open:border-brand/25 open:shadow-soft"
-                  >
-                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-4 py-3.5 text-sm font-bold leading-5 text-ink marker:hidden hover:text-brand-dark sm:px-5">
-                      <span>{faq.q}</span>
-                      <span
-                        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper font-mono text-sm text-brand-dark transition-transform group-open:rotate-45 group-open:bg-sage"
-                        aria-hidden="true"
-                      >
-                        +
-                      </span>
-                    </summary>
-                    <p className="px-4 pb-4 text-sm leading-6 text-muted sm:px-5 sm:pb-5">{faq.a}</p>
-                  </details>
-                ))}
+              <span className="text-muted">Cookies &amp; auth headers are never forwarded</span>
+            </>
+          ) : (
+            <>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[6px] border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+                  <span
+                    className="hub-local-dot shrink-0"
+                    data-pulsing={isPulsing ? 'true' : 'false'}
+                    aria-hidden="true"
+                  />
+                  <span>{isPulsing ? 'Local · Executing' : 'Local'}</span>
+                </span>
+                <span className="min-w-0 text-muted">
+                  Runs offline - open DevTools Network tab
+                </span>
               </div>
-            </section>
+              <span className="text-ink">No data leaves your device</span>
+            </>
           )}
         </div>
-      </main>
-
-      <SiteFooter variant="tool" />
+      </div>
     </div>
   );
-};
+}

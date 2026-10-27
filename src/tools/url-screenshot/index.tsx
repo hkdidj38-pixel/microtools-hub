@@ -63,9 +63,9 @@ export default function UrlScreenshotTool() {
 
   return (
     <div className="tool-workspace space-y-5 sm:space-y-6">
-      <form onSubmit={inspect} className="rounded-2xl border border-line bg-paper/55 p-4 sm:p-5">
+      <form onSubmit={inspect} className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
         <div className="mb-4 flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-brand shadow-sm"><Globe2 className="h-5 w-5" aria-hidden="true" /></span>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[8px] border border-line bg-paper text-brand"><Globe2 className="h-5 w-5" aria-hidden="true" /></span>
           <div>
             <label htmlFor="target-url" className="block text-sm font-bold text-ink">HTTPS page address</label>
             <p className="mt-1 text-xs leading-5 text-muted">Metadata and edge telemetry only — this tool does not capture screenshots.</p>
@@ -82,13 +82,13 @@ export default function UrlScreenshotTool() {
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://example.com"
-              className="hub-input min-h-12 pr-3"
+              className="hub-input min-h-12 pr-3 font-mono"
             />
           </div>
           <button
             type="submit"
             disabled={isLoading || !url.trim()}
-            className="hub-button-primary min-h-12 w-full shrink-0 sm:w-auto sm:min-w-44"
+            className="hub-button-accent min-h-12 w-full shrink-0 sm:w-auto sm:min-w-44"
           >
             {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Activity className="h-4 w-4" aria-hidden="true" />}
             {isLoading ? 'Inspecting…' : 'Inspect metadata'}
@@ -97,16 +97,16 @@ export default function UrlScreenshotTool() {
         <p className="mt-2 text-xs leading-5 text-muted">Only exact operator-approved HTTPS hosts are accepted. Inspection remains unavailable until secure egress is configured.</p>
       </form>
 
-      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+      {error && <p className="rounded-[8px] border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">{error}</p>}
 
-      <section aria-labelledby="inspection-report-heading" aria-live="polite" className="min-w-0 overflow-hidden rounded-2xl border border-line bg-white">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper/70 px-4 py-3.5 sm:px-5">
+      <section aria-labelledby="inspection-report-heading" aria-live="polite" className="min-w-0 overflow-hidden rounded-[10px] border border-line bg-surface">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper px-4 py-3.5 sm:px-5">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand">Inspection report</p>
-            <h2 id="inspection-report-heading" className="mt-1 text-sm font-extrabold text-ink">Page metadata &amp; edge details</h2>
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-brand">Inspection report</p>
+            <h2 id="inspection-report-heading" className="mt-1 text-sm font-bold text-ink">Page metadata &amp; edge details</h2>
           </div>
           {result && (
-            <span className={`inline-flex min-h-8 items-center rounded-full px-3 py-1 text-xs font-bold ${result.upstreamStatus < 400 ? 'bg-brand-soft text-brand-dark' : 'bg-amber-100 text-amber-950'}`}>
+            <span className={`inline-flex min-h-7 items-center rounded-[6px] border px-2.5 py-0.5 font-mono text-xs font-semibold ${result.upstreamStatus < 400 ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/35 bg-amber-500/10 text-amber-200'}`}>
               HTTP {result.upstreamStatus} {result.upstreamStatusText}
             </span>
           )}

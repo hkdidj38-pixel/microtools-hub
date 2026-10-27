@@ -2,7 +2,9 @@ export const meta = {
   slug: 'media-converter',
   name: 'Media Converter',
   description: 'Convert small MP4, WebM, MP3, WAV, and OGG files locally in your browser with FFmpeg WebAssembly. Codec support varies; no media upload is performed.',
-  category: 'Media',
+  useCase: 'Transcode MP4/WebM video and extract MP3/WAV/OGG audio via SHA-verified FFmpeg WASM.',
+  codePreview: 'ffmpeg -i input.mp4 -c:v libvpx output.webm',
+  category: 'Files',
   privacy: {
     mode: 'local',
     label: 'Local media conversion',
@@ -16,6 +18,11 @@ export const meta = {
     'local video compression',
     'browser ffmpeg',
   ],
+  steps: [
+    { title: 'Select a local media container', detail: 'Choose an MP4, WebM, MP3, WAV, or OGG file up to 20 MiB and 10 minutes.' },
+    { title: 'Pick transcode or audio extraction', detail: 'Integrity-checked FFmpeg WASM core parts load from same-origin storage on demand.' },
+    { title: 'Download transcoded stream', detail: 'Cancel anytime to terminate the worker and reclaim browser memory immediately.' },
+  ],
   faqs: [
     {
       q: 'Are my media files uploaded?',
@@ -23,7 +30,7 @@ export const meta = {
     },
     {
       q: 'Which formats can I use?',
-      a: 'This proof of concept accepts MP4 and WebM video containers, and MP3, WAV, and OGG audio containers. The input decoder allowlist is H.264/AAC, VP8/Opus, MP3, Vorbis, and 16-bit PCM; other codecs in these containers fail.'
+      a: 'This proof of concept accepts MP4 and WebM video containers, and MP3, WAV, and OGG audio containers. The input decoder allowlist is H.264/AAC, VP8/Opus, MP3, Vorbis, and 16-bit PCM; other codecs in these containers fail.',
     },
     {
       q: 'Are there media or device limits?',

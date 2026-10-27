@@ -214,14 +214,14 @@ export default function MediaConverterTool() {
   return (
     <div className="space-y-6">
       {!hasBrowserSupport() && (
-        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
+        <div className="flex gap-3 rounded-[10px] border border-amber-500/35 bg-amber-500/10 p-4 text-sm text-amber-200" role="alert">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <p>This browser is missing required WebAssembly or Worker support. Try a current desktop browser.</p>
         </div>
       )}
 
       {deviceMemoryGiB !== null && Number.isFinite(deviceMemoryGiB) && deviceMemoryGiB <= 4 && (
-        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+        <div className="flex gap-3 rounded-[10px] border border-amber-500/35 bg-amber-500/10 p-4 text-sm text-amber-200" role="status">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <p>This browser reports a low-memory device ({deviceMemoryGiB} GiB or less). Media conversion may fail or make the browser unresponsive; close other tabs and use smaller files if possible.</p>
         </div>
@@ -250,7 +250,7 @@ export default function MediaConverterTool() {
           onDrop={onDrop}
           className={`hub-dropzone flex min-h-36 flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition-[border-color,background-color,box-shadow] duration-standard ease-standard ${isBusy ? 'cursor-not-allowed border-line bg-paper/60 opacity-70' : isDragActive ? 'cursor-pointer border-brand bg-brand-soft ring-2 ring-brand/20 shadow-soft' : 'cursor-pointer border-brand/30 bg-brand-soft/40 hover:border-brand hover:bg-brand-soft/70'}`}
         >
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand shadow-sm">
+          <span className="grid h-12 w-12 place-items-center rounded-[10px] border border-line bg-surface text-brand">
             {fileFormat && FORMAT_INFO[fileFormat].kind === 'audio'
               ? <FileAudio className="h-6 w-6" aria-hidden="true" />
               : <FileVideo className="h-6 w-6" aria-hidden="true" />}
@@ -362,13 +362,13 @@ export default function MediaConverterTool() {
         )}
       </div>
 
-      <div className="rounded-2xl border border-line bg-paper/50 p-4" aria-live="polite" aria-atomic="true">
+      <div className="rounded-[10px] border border-line bg-surface p-4" aria-live="polite" aria-atomic="true">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-          {result ? <CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden="true" /> : isBusy ? <LoaderCircle className="h-4 w-4 animate-spin text-brand" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />}
+          {result ? <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" /> : isBusy ? <LoaderCircle className="h-4 w-4 animate-spin text-brand" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />}
           <span>{status}</span>
         </p>
         {downloadProgress && isBusy && (
-          <div className="mt-3 rounded-xl border border-line bg-white p-3 motion-safe:animate-hub-enter">
+          <div className="mt-3 rounded-[8px] border border-line bg-paper p-3 motion-safe:animate-hub-enter">
             <div className="mb-1 flex justify-between gap-3 text-xs text-muted">
               <span>Downloading FFmpeg core (~32 MB, one-time per browser cache)</span>
               <span>{Math.round(downloadProgress.progress * 100)}%</span>
@@ -390,16 +390,16 @@ export default function MediaConverterTool() {
           </div>
         )}
         {error && (
-          <p className="hub-notification--error mt-3 flex items-start gap-2 text-sm text-red-700 motion-safe:animate-hub-enter" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>
+          <p className="hub-notification--error mt-3 flex items-start gap-2 text-sm text-rose-300 motion-safe:animate-hub-enter" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>
         )}
         {result && outputURLRef.current && (
-          <div className="hub-results-panel--media mt-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-white p-3 motion-safe:animate-hub-enter sm:flex-row sm:items-center sm:justify-between">
+          <div className="hub-results-panel--media mt-4 flex flex-col gap-3 rounded-[10px] border border-emerald-500/35 bg-paper p-3 motion-safe:animate-hub-enter sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="break-words text-sm font-bold text-ink">{result.fileName}</p>
-              <p className="mt-1 text-xs text-muted">{result.outputFormat.toUpperCase()} · {formatBytes(result.outputSize)}</p>
-              {file && result.outputSize >= file.size && (operation === 'video-compress' || operation === 'video-convert') && <p className="mt-1 text-xs text-amber-800">This result is not smaller than the input.</p>}
+              <p className="mt-1 font-mono text-xs text-muted">{result.outputFormat.toUpperCase()} · {formatBytes(result.outputSize)}</p>
+              {file && result.outputSize >= file.size && (operation === 'video-compress' || operation === 'video-convert') && <p className="mt-1 text-xs text-amber-300">This result is not smaller than the input.</p>}
             </div>
-            <a href={outputURLRef.current} download={result.fileName} className="hub-button-primary shrink-0">
+            <a href={outputURLRef.current} download={result.fileName} className="hub-button-accent shrink-0">
               <Download className="h-4 w-4" aria-hidden="true" /> Download output
             </a>
           </div>

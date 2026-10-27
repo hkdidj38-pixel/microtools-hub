@@ -1,37 +1,30 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}', './scripts/prerender.mjs'],
   theme: {
     extend: {
       colors: {
+        paper: 'rgb(var(--hub-paper-rgb) / <alpha-value>)',
+        surface: {
+          DEFAULT: 'rgb(var(--hub-surface-rgb) / <alpha-value>)',
+          hover: 'rgb(var(--hub-surface-hover-rgb) / <alpha-value>)',
+        },
+        line: 'rgb(var(--hub-line-rgb) / <alpha-value>)',
         ink: 'rgb(var(--hub-ink-rgb) / <alpha-value>)',
         muted: {
           DEFAULT: 'rgb(var(--hub-muted-rgb) / <alpha-value>)',
           subtle: 'rgb(var(--hub-muted-subtle-rgb) / <alpha-value>)',
         },
-        paper: 'rgb(var(--hub-paper-rgb) / <alpha-value>)',
-        line: 'rgb(var(--hub-line-rgb) / <alpha-value>)',
         brand: {
           DEFAULT: 'rgb(var(--hub-brand-rgb) / <alpha-value>)',
           dark: 'rgb(var(--hub-brand-dark-rgb) / <alpha-value>)',
           soft: 'rgb(var(--hub-brand-soft-rgb) / <alpha-value>)',
         },
-        sage: {
-          DEFAULT: 'rgb(var(--hub-sage-rgb) / <alpha-value>)',
-          ink: 'rgb(var(--hub-sage-ink-rgb) / <alpha-value>)',
+        pink: {
+          accent: 'rgb(var(--hub-pink-rgb) / <alpha-value>)',
         },
-        lavender: {
-          DEFAULT: 'rgb(var(--hub-lavender-rgb) / <alpha-value>)',
-          ink: 'rgb(var(--hub-lavender-ink-rgb) / <alpha-value>)',
-        },
-        peach: {
-          DEFAULT: 'rgb(var(--hub-peach-rgb) / <alpha-value>)',
-          ink: 'rgb(var(--hub-peach-ink-rgb) / <alpha-value>)',
-        },
-        'blue-gray': {
-          DEFAULT: 'rgb(var(--hub-blue-gray-rgb) / <alpha-value>)',
-          ink: 'rgb(var(--hub-blue-gray-ink-rgb) / <alpha-value>)',
-        },
+        success: 'rgb(var(--hub-success-rgb) / <alpha-value>)',
         lime: 'rgb(var(--hub-lime-rgb) / <alpha-value>)',
       },
       boxShadow: {
@@ -40,20 +33,20 @@ export default {
         panel: 'var(--hub-shadow-panel)',
       },
       borderRadius: {
+        'hub-input': 'var(--hub-radius-input)',
         'hub-control': 'var(--hub-radius-control)',
         'hub-card': 'var(--hub-radius-card)',
         'hub-panel': 'var(--hub-radius-panel)',
-        '4xl': '2rem',
       },
       fontSize: {
-        'hub-display': ['var(--hub-type-display)', { lineHeight: '1.03', letterSpacing: '-0.04em' }],
-        'hub-section': ['var(--hub-type-section)', { lineHeight: '1.12', letterSpacing: '-0.032em' }],
-        'hub-page': ['var(--hub-type-page)', { lineHeight: '1.08', letterSpacing: '-0.04em' }],
+        'hub-display': ['var(--hub-type-display)', { lineHeight: '1.06', letterSpacing: '-0.03em' }],
+        'hub-section': ['var(--hub-type-section)', { lineHeight: '1.15', letterSpacing: '-0.02em' }],
+        'hub-page': ['var(--hub-type-page)', { lineHeight: '1.12', letterSpacing: '-0.025em' }],
       },
       fontFamily: {
-        sans: ['"DM Sans"', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
-        serif: ['"Playfair Display"', '"Iowan Old Style"', '"Palatino Linotype"', '"Book Antiqua"', 'Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
-        mono: ['"DM Mono"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', 'monospace'],
+        heading: ['"Geist"', '"Geist Sans"', '"Inter Tight"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"Geist"', '"Geist Sans"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       spacing: {
         'hub-gutter': 'var(--hub-gutter)',
@@ -69,16 +62,16 @@ export default {
       },
       keyframes: {
         'hub-enter': {
-          from: { opacity: '0', transform: 'translateY(0.65rem)' },
+          from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
         'hub-card-enter': {
-          from: { opacity: '0', transform: 'translateY(0.55rem)' },
+          from: { opacity: '0', transform: 'translateY(4px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
         'hub-menu-in': {
-          from: { opacity: '0', transform: 'translateY(-0.3rem)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
+          from: { opacity: '0', transform: 'scale(0.98) translateY(-4px)' },
+          to: { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
       },
       animation: {
