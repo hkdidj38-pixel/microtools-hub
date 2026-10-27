@@ -109,7 +109,7 @@ export default function RegexTesterTool() {
         });
       };
       worker.onerror = (err) => {
-        if (requestId !== requestIdRef.current) return;
+        if (workerRef.current !== worker) return;
         stopWorker(err.message || 'Regex worker error.');
       };
       workerRef.current = worker;

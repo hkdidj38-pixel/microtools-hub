@@ -240,6 +240,7 @@ try {
       cardRadius: cardStyle?.borderRadius,
       cardShadow: cardStyle?.boxShadow,
       accentBgImage: accentStyle?.backgroundImage ?? '',
+      mutedSubtleRgb: getComputedStyle(document.documentElement).getPropertyValue('--hub-muted-subtle-rgb').trim(),
       stealBgImage: stealStyle?.backgroundImage ?? '',
     };
   });
@@ -248,8 +249,25 @@ try {
   assert.equal(designTokens.cardBg, 'rgb(21, 21, 24)', 'Surface cards must be #151518.');
   assert.equal(designTokens.cardRadius, '10px', 'Bento cards must use 10px border radius.');
   assert.equal(designTokens.cardShadow, 'none', 'Resting cards must not use soft drop shadows.');
-  assert.match(designTokens.accentBgImage, /linear-gradient\(135deg,\s*rgb\(139,\s*92,\s*246\)/, 'Primary accent button must use the #8B5CF6 -> #EC4899 gradient.');
+  assert.match(designTokens.accentBgImage, /linear-gradient\(135deg,\s*rgb\(109,\s*40,\s*217\).*rgb\(190,\s*24,\s*93\)/, 'Primary accent button must use the accessible violet-to-pink gradient.');
   assert.match(designTokens.stealBgImage, /linear-gradient\(135deg,\s*rgb\(139,\s*92,\s*246\)/, 'Hero word "steal" must use the accent gradient.');
+  const accentStops = Array.from(designTokens.accentBgImage.matchAll(/rgb\(([^)]+)\)/g), (match) =>
+    match[1].trim().split(/[\s,/]+/).filter(Boolean).map(Number),
+  );
+  assert.equal(accentStops.length, 2, 'Accent button gradient must have two explicit color stops.');
+  for (let step = 0; step <= 100; step += 1) {
+    const ratio = step / 100;
+    const channels = accentStops[0].map((start, index) =>
+      Math.round(start + (accentStops[1][index] - start) * ratio),
+    );
+    const contrast = contrastRatio('rgb(255, 255, 255)', `rgb(${channels.join(', ')})`);
+    assert.ok(contrast >= 4.5, `Accent button text contrast ${contrast.toFixed(2)}:1 must meet WCAG AA.`);
+  }
+  const mutedSubtleContrast = contrastRatio(
+    `rgb(${designTokens.mutedSubtleRgb})`,
+    designTokens.cardBg,
+  );
+  assert.ok(mutedSubtleContrast >= 4.5, `Subtle-label contrast ${mutedSubtleContrast.toFixed(2)}:1 must meet WCAG AA.`);
 
   // Anti-generic check: ensure zero buttons on the app use default Tailwind blue (#3B82F6 = rgb(59, 130, 246))
   const hasBlueButton = await page.evaluate(() => {
@@ -432,6 +450,62 @@ try {
     return Boolean(out && out.value.includes('"match": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa"'));
   });
 
+  const workerErrorPage = await context.newPage();
+  await workerErrorPage.addInitScript(() => {
+    class ControlledWorker {
+      onmessage = null;
+      onerror = null;
+      postCount = 0;
+      static instance;
+
+      constructor() {
+        ControlledWorker.instance = this;
+      }
+
+      postMessage(request) {
+        this.postCount += 1;
+        queueMicrotask(() => {
+          this.onmessage?.({
+            data: {
+              requestId: request.requestId,
+              output: '[]',
+              error: null,
+              detail: '0 matches',
+              execMs: 0.05,
+            },
+          });
+        });
+      }
+
+      terminate() {}
+    }
+
+    window.__ControlledWorker = ControlledWorker;
+    window.Worker = ControlledWorker;
+  });
+  await workerErrorPage.goto(`${baseURL}/tools/regex-tester`, { waitUntil: 'networkidle' });
+  await workerErrorPage.getByLabel('Tool input').fill('trigger worker request');
+  await workerErrorPage.waitForFunction(() => window.__ControlledWorker?.instance?.postCount >= 2);
+  await workerErrorPage.evaluate(() => {
+    window.__ControlledWorker.instance.onerror({ message: 'Simulated regex worker failure.' });
+  });
+  await workerErrorPage.getByRole('alert').filter({ hasText: 'Simulated regex worker failure.' }).waitFor();
+  assert.equal(
+    await workerErrorPage.getByRole('button', { name: 'Stop' }).count(),
+    0,
+    'A failed active regex worker must stop the running state.',
+  );
+  await workerErrorPage.close();
+
+  await page.goto(`${baseURL}/tools/html-entities`, { waitUntil: 'networkidle' });
+  await page.getByLabel('Tool input').fill('&notit;');
+  await page.getByRole('button', { name: 'Unescape Entities' }).click();
+  await page.waitForFunction(() => {
+    const out = document.querySelector('textarea[aria-label="Tool output"]');
+    return Boolean(out && out.value === '&notit;');
+  });
+  assert.match(await page.getByLabel('Live tool statistics').innerText(), /unrecognized entity ref/i);
+
   // Issue 10: Stale async File.prototype.text() upload completion must not overwrite newer user edits
   await page.goto(`${baseURL}/tools/json-formatter`, { waitUntil: 'networkidle' });
   await page.evaluate(() => {
@@ -448,9 +522,10 @@ try {
     mimeType: 'application/json',
     buffer: Buffer.from('{"stale":true}'),
   });
+  await page.waitForFunction(() => typeof window.__releaseDelayedUpload === 'function', null, { timeout: 5_000 });
   await page.getByLabel('Tool input').fill('{"fresh":42}');
   await page.evaluate(async () => {
-    window.__releaseDelayedUpload?.();
+    window.__releaseDelayedUpload();
     await new Promise((r) => setTimeout(r, 50));
     if (window.__origFileText) File.prototype.text = window.__origFileText;
   });

@@ -80,6 +80,21 @@ test('JWT inspector decodes header, claims, and human-readable exp/iat timestamp
 
   const bad = logic.inspectJwt('not-a-jwt');
   assert.ok(bad.error);
+
+  const missingSignature = logic.inspectJwt(`${header}.${payload}`);
+  assert.match(missingSignature.error ?? '', /Expected 3 dot-separated JWT segments/);
+
+  const emptySignature = logic.inspectJwt(`${header}.${payload}.`);
+  assert.equal(emptySignature.error, null);
+  assert.equal(JSON.parse(emptySignature.output).signature, 'none (unsecured JWT)');
+
+  const outOfRangePayload = Buffer.from(
+    JSON.stringify({ iat: 1e13, sub: 'still-readable' }),
+  ).toString('base64url');
+  const outOfRange = logic.inspectJwt(`${header}.${outOfRangePayload}.`);
+  assert.equal(outOfRange.error, null);
+  assert.equal(JSON.parse(outOfRange.output).decodedTimestamps.iat, 'out of range');
+  assert.equal(JSON.parse(outOfRange.output).payload.sub, 'still-readable');
 });
 
 test('Base64 and Base64URL codec handles multi-byte UTF-8 round-trips cleanly', () => {
@@ -134,6 +149,10 @@ test('URL codec and HTML entity codec round-trip special characters', () => {
   const parsed = JSON.parse(inspected.output);
   assert.equal(parsed.queryCount, 2);
   assert.equal(parsed.query.q, 'json ast');
+
+  const queryWithUrlValue = logic.transformUrl('redirect=https://app.example.dev/dashboard', 'parse');
+  assert.equal(queryWithUrlValue.error, null);
+  assert.equal(JSON.parse(queryWithUrlValue.output).query.redirect, 'https://app.example.dev/dashboard');
 
   const html = '<script src="/app.js" data-label="A & B"></script>';
   const encoded = logic.transformHtmlEntities(html, 'encode');
@@ -243,6 +262,12 @@ test('PR #39 regressions: Unicode regex lastIndex, astral HTML entities, full na
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test('JSON key sorting is locale-independent and uses code-unit order', () => {
+  const sorted = logic.transformJson('{"a":1,"Z":2,"A":3}', 'sort');
+  assert.equal(sorted.error, null);
+  assert.deepEqual(Object.keys(JSON.parse(sorted.output)), ['A', 'Z', 'a']);
 });
 
 test('All 16 tool meta.ts files have zero imports and complete metadata', () => {

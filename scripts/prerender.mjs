@@ -222,9 +222,6 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://w
   .map((url) => `  <url><loc>${xmlEsc(url)}</loc></url>`)
   .join('\n')}\n</urlset>\n`;
 fs.writeFileSync(path.join(distDir, 'sitemap.xml'), sitemap, 'utf8');
-if (fs.existsSync(path.resolve('public'))) {
-  fs.writeFileSync(path.resolve('public/sitemap.xml'), sitemap, 'utf8');
-}
 
 const robotsPath = path.join(distDir, 'robots.txt');
 if (fs.existsSync(robotsPath)) {

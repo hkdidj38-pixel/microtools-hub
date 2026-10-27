@@ -97,7 +97,7 @@
   }
 
   .hub-button-accent {
-    background-image: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+    background-image: linear-gradient(135deg, #6D28D9 0%, #BE185D 100%);
     @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-hub-control px-4 py-2 text-sm font-medium text-white transition-opacity duration-fast ease-standard hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45;
   }
 

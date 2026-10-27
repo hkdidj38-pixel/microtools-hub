@@ -4,11 +4,15 @@ export interface TransformOutcome {
   detail?: string;
 }
 
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function sortJsonDeep(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortJsonDeep);
   if (value !== null && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => compareCodeUnits(a, b))
       .map(([k, v]) => [k, sortJsonDeep(v)]);
     return Object.fromEntries(entries);
   }
@@ -55,7 +59,7 @@ export function inspectJwt(input: string): TransformOutcome {
   if (!trimmed) return { output: '', error: null };
 
   const parts = trimmed.split('.');
-  if (parts.length < 2 || parts.length > 3) {
+  if (parts.length !== 3) {
     return {
       output: '',
       error: `Expected 3 dot-separated JWT segments (header.payload.signature), received ${parts.length}.`,
@@ -73,7 +77,8 @@ export function inspectJwt(input: string): TransformOutcome {
     for (const key of ['iat', 'nbf', 'exp', 'auth_time']) {
       const value = payload[key];
       if (typeof value === 'number' && Number.isFinite(value)) {
-        timing[key] = new Date(value * 1000).toISOString();
+        const date = new Date(value * 1000);
+        timing[key] = Number.isNaN(date.getTime()) ? 'out of range' : date.toISOString();
       }
     }
 
@@ -243,7 +248,8 @@ export function transformUrl(
     }
 
     const candidate = input.trim();
-    const url = candidate.includes('://')
+    const isAbsoluteUrl = /^[A-Za-z][A-Za-z\d+.-]*:\/\//.test(candidate);
+    const url = isAbsoluteUrl
       ? new URL(candidate)
       : new URL(
           candidate.startsWith('?')
@@ -265,17 +271,18 @@ export function transformUrl(
       }
     }
 
-    const parsed = candidate.includes('://')
+    const queryCount = Array.from(url.searchParams.keys()).length;
+    const parsed = isAbsoluteUrl
       ? {
           protocol: url.protocol,
           host: url.host,
           pathname: url.pathname,
-          queryCount: Array.from(url.searchParams.keys()).length,
+          queryCount,
           query: params,
           hash: url.hash || null,
         }
       : {
-          queryCount: Array.from(url.searchParams.keys()).length,
+          queryCount,
           query: params,
         };
 
@@ -596,7 +603,21 @@ function decodeBrowserNamedEntity(fullEntity: string): string | null {
   cachedEntityTextarea.innerHTML = fullEntity;
   const decoded = cachedEntityTextarea.value;
   cachedEntityTextarea.textContent = '';
-  return decoded !== fullEntity ? decoded : null;
+  return decoded !== fullEntity && Array.from(decoded).length <= 2 ? decoded : null;
+}
+
+function decodeNumericEntity(entity: string): string | null {
+  const isHex = entity.startsWith('#x') || entity.startsWith('#X');
+  const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+  if (
+    !Number.isFinite(code) ||
+    code < 0 ||
+    code > 0x10ffff ||
+    (code >= 0xd800 && code <= 0xdfff)
+  ) {
+    return null;
+  }
+  return String.fromCodePoint(code);
 }
 
 export function transformHtmlEntities(input: string, mode: 'encode' | 'decode'): TransformOutcome {
@@ -625,19 +646,9 @@ export function transformHtmlEntities(input: string, mode: 'encode' | 'decode'):
 
   const unresolved = new Set<string>();
   const decoded = input.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z][a-zA-Z0-9]*);/g, (full, entity: string) => {
-    if (entity.startsWith('#x') || entity.startsWith('#X')) {
-      const code = Number.parseInt(entity.slice(2), 16);
-      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)) {
-        return String.fromCodePoint(code);
-      }
-      unresolved.add(full);
-      return full;
-    }
     if (entity.startsWith('#')) {
-      const code = Number.parseInt(entity.slice(1), 10);
-      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)) {
-        return String.fromCodePoint(code);
-      }
+      const numericDecoded = decodeNumericEntity(entity);
+      if (numericDecoded !== null) return numericDecoded;
       unresolved.add(full);
       return full;
     }
@@ -956,7 +967,7 @@ export function analyzeTextMetrics(input: string): TransformOutcome {
     if (clean.length >= 3) freq.set(clean, (freq.get(clean) ?? 0) + 1);
   }
   const topTokens = Array.from(freq.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || compareCodeUnits(a[0], b[0]))
     .slice(0, 6)
     .map(([token, count]) => ({ token, count }));
 
